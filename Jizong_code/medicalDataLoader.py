@@ -106,18 +106,21 @@ class MedicalImageDataset(Dataset):
     def __len__(self):
         return len(self.imgs)
 
-    def augment(self, img, mask):
+    def augment(self, img, mask, weak_mask):
         if random() > 0.5:
             img = ImageOps.flip(img)
             mask = ImageOps.flip(mask)
+            weak_mask = ImageOps.flip(weak_mask)
         if random() > 0.5:
             img = ImageOps.mirror(img)
             mask = ImageOps.mirror(mask)
+            weak_mask = ImageOps.mirror(weak_mask)
         if random() > 0.5:
             angle = random() * 90 - 45
             img = img.rotate(angle)
             mask = mask.rotate(angle)
-        return img, mask
+            weak_mask = weak_mask.rotate(angle)
+        return img, mask, weak_mask
 
     def __getitem__(self, index):
         img_path, mask_path, mask_weak_path = self.imgs[index]
@@ -130,18 +133,18 @@ class MedicalImageDataset(Dataset):
             img = ImageOps.equalize(img)
 
         if self.augmentation:
-            img, mask = self.augment(img, mask)
+            img, mask, mask_weak = self.augment(img, mask,mask_weak)
 
         if self.transform:
             img = self.transform(img)
             mask = self.mask_transform(mask)
             mask = (mask==1).long()
-            # mask = self.pixelvalue2OneHot(mask)
+            # mask = self.mask_pixelvalue2OneHot(mask)
             mask_weak = self.mask_transform(mask_weak)
 
         return [img, mask, mask_weak, img_path]
 
-    def pixelvalue2OneHot(self,mask):
+    def mask_pixelvalue2OneHot(self,mask):
         possible_pixel_values = [0.000000, 0.33333334, 0.66666669, 1.000000]
         mask_ = mask.clone()
         for i,p in enumerate(possible_pixel_values):

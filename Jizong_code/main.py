@@ -38,7 +38,7 @@ val_set = medicalDataLoader.MedicalImageDataset('val',root_dir,transform=transfo
 val_loader = DataLoader(val_set, batch_size=batch_size_val, num_workers=num_workers, shuffle=True)
 num_classes=2
 net = UNet(num_classes=num_classes).cuda()
-net.load_state_dict(torch.load('U_net_2Class.pth'))
+# net.load_state_dict(torch.load('U_net_2Class.pth'))
 # net.final = nn.Conv2d(64, 4, 1).cuda()
 # net = Enet(num_classes=2).cuda()
 optimiser = torch.optim.Adam(net.parameters(),lr=lr)
