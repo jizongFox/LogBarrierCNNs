@@ -19,8 +19,8 @@ board_loss = Dashboard(server='http://turing.livia.etsmtl.ca',env="loss")
 cuda_device = "0"
 batch_size = 16
 batch_size_val = 16
-num_workers = 8
-lr = 0.0002
+num_workers = 16
+lr = 0.001
 max_epoch = 100
 root_dir = '../ACDC-2D-All'
 model_dir = 'model'
@@ -68,7 +68,7 @@ def val():
         diceloss= dice_loss(segm,mask)
         dice_loss_meter.add(diceloss.item())
 
-        if i % 100 == 0:
+        if i % 10 == 0:
 
             board_image.image(img[0], 'medical image')
             board_image.image(color_transform(weak_mask[0]), 'weak_mask')
