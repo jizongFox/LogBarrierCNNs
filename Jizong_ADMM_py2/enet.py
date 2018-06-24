@@ -17,7 +17,7 @@ class InitialBlock(nn.Module):
 
     def __init__(self):
         super(InitialBlock, self).__init__()
-        self.conv = nn.Conv2d(1, 13, (3, 3), stride=2, padding=1)
+        self.conv = nn.Conv2d(3, 13, (3, 3), stride=2, padding=1)
         self.batch_norm = nn.BatchNorm2d(13, 1e-3)
         self.prelu = nn.PReLU(13)
         self.pool = nn.MaxPool2d(2, stride=2)
@@ -134,7 +134,7 @@ class BottleNeck(nn.Module):
                                             input_shape[2] // 2,
                                             input_shape[3] // 2).zero_(), requires_grad=False)
                 if (torch.cuda.is_available):
-                    pad = pad.cuda(0)
+                    pad = pad.cuda()
                 main = torch.cat((main, pad), 1)
         elif self.upsampling:
             main = self.unpool(self.conv_before_unpool(input), pooling_indices)

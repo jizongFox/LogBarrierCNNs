@@ -25,6 +25,7 @@ mask_transform = transforms.Compose([
 def make_dataset(root, mode):
     assert mode in ['train', 'val', 'test']
     items = []
+
     if mode == 'train':
         train_img_path = os.path.join(root, 'train', 'Img')
         train_mask_path = os.path.join(root, 'train', 'GT')
@@ -33,7 +34,6 @@ def make_dataset(root, mode):
         images = os.listdir(train_img_path)
         labels = os.listdir(train_mask_path)
         labels_weak = os.listdir(train_mask_weak_path)
-
         images.sort()
         labels.sort()
         labels_weak.sort()
@@ -126,7 +126,7 @@ class MedicalImageDataset(Dataset):
     def __getitem__(self, index):
         img_path, mask_path, mask_weak_path = self.imgs[index]
         # print("{} and {}".format(img_path,mask_path))
-        img = Image.open(img_path)  # .convert('RGB')
+        img = Image.open(img_path).convert('RGB')  # .convert('RGB')
         mask = Image.open(mask_path)  # .convert('RGB')
         mask_weak = Image.open(mask_weak_path).convert('L')
         

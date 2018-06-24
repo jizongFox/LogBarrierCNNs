@@ -9,14 +9,20 @@ from criterion import  CrossEntropyLoss2d
 import pandas as pd, torch, torch.nn as nn, torch.nn.functional as F
 from tqdm import tqdm
 from torchnet.meter import AverageValueMeter
-from utils import pred2segmentation,dice_loss,Colorize
+from utils import pred2segmentation,dice_loss,Colorize,show_image_mask
 from visualize import Dashboard
+from pretrain_network import pretrain
+# import logging
+# import inspect
+# print(inspect.getsource(logging))
 
-board = Dashboard()
-use_gpu = False
+board_image = Dashboard(server='http://turing.livia.etsmtl.ca',env="ADMM_image")
+board_loss = Dashboard(server='http://turing.livia.etsmtl.ca',env="ADMM_loss")
+
+use_gpu = True
 device = "cuda" if torch.cuda.is_available() and use_gpu else "cpu"
 
-batch_size = 4
+batch_size = 1
 batch_size_val = 4
 num_workers = 0
 lr = 0.001
@@ -44,24 +50,41 @@ labeled_dataset.imgs = [train_set.imgs[x] for x in  random_index[:int(len(random
 unlabeled_dataset = copy.deepcopy(train_set)
 unlabeled_dataset.imgs = [train_set.imgs[x] for x in  random_index[int(len(random_index)*split_ratio):]]
 assert set(unlabeled_dataset.imgs)&set(labeled_dataset.imgs) ==set(), "there's intersection between labeled and unlabeled training set."
-labeled_dataLoader = DataLoader(labeled_dataset,batch_size=batch_size,num_workers=num_workers,shuffle=True)
-unlabeled_dataLoader = DataLoader(unlabeled_dataset,batch_size=batch_size,num_workers=num_workers,shuffle=True)
+labeled_dataLoader = DataLoader(labeled_dataset,batch_size=1,num_workers=num_workers,shuffle=True)
+unlabeled_dataLoader = DataLoader(unlabeled_dataset,batch_size=1,num_workers=num_workers,shuffle=True)
 ## Here we terminate the split of labeled and unlabeled data
-
 ## the validation set is for computing the dice loss.
 val_set = medicalDataLoader.MedicalImageDataset('val',root_dir,transform=transform,mask_transform=mask_transform,equalize=False)
 val_loader = DataLoader(val_set, batch_size=batch_size_val, num_workers=num_workers, shuffle=True)
 ##
 ##=====================================================================================================================#
+# np.random.choice(labeled_dataset)
+
+net = Enet(2).to(device)
+# path_to_save ='checkpoint/pretrained_Enet'
+# pretrain(labeled_dataLoader,net,)
+net.load_state_dict(torch.load('checkpoint/pretrained_net.pth'))
+optimiser = torch.optim.Adam(net.parameters(),lr = lr, weight_decay=1e-5)
+
+for iteration in xrange(10000):
+
+    ## choose randomly a image from labeled dataset and unlabeled dataset.
+    labeled_dataLoader, unlabeled_dataLoader = iter(labeled_dataLoader), iter(unlabeled_dataLoader)
+    labeled_img,labeled_mask, labeled_weak_mask = next(labeled_dataLoader)[0:3]
+    unlabeled_img = next(unlabeled_dataLoader)[0]
+
+
+
+
+
+
 
 num_classes=2
 net = UNet(num_classes=num_classes).to(device)
-# net.load_state_dict(torch.load('U_net_2Class.pth'))
-# net.final = nn.Conv2d(64, 4, 1).to(device)
-# net = Enet(num_classes=2).to(device)
+
 optimiser = torch.optim.Adam(net.parameters(),lr=lr)
 weight = torch.ones(num_classes)
-# weight[0]=0
+weight[0]=1e-1
 criterion = CrossEntropyLoss2d(weight.to(device)).to(device)
 
 if __name__=="__main__":
@@ -73,8 +96,8 @@ if __name__=="__main__":
             for param_group in optimiser.param_groups:
                 param_group['lr'] = lr * (0.98 ** (epoch // 3))
                 print('learning rate:', param_group['lr'])
-            print('save model:')
-            torch.save(net.state_dict(), 'U_net_2Class.pth')
+            # print('save model:')
+            # torch.save(net.state_dict(), 'U_net_2Class.pth')
 
 
         for i, (img,mask,_,_) in tqdm(enumerate(train_loader)):

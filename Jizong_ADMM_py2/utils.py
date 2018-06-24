@@ -63,3 +63,12 @@ class Colorize:
             except:
                 print(1)
         return color_image
+
+
+def show_image_mask(img,mask):
+    plt.figure()
+    plt.imshow(img.cpu().data.numpy().squeeze())
+    plt.show()
+    plt.figure()
+    plt.imshow(mask.cpu().data.numpy().squeeze())
+    plt.show()
