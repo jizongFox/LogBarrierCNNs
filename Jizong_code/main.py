@@ -17,9 +17,9 @@ board_image = Dashboard(server='http://turing.livia.etsmtl.ca',env="image")
 board_loss = Dashboard(server='http://turing.livia.etsmtl.ca',env="loss")
 
 cuda_device = "0"
-batch_size = 1
-batch_size_val = 1
-num_workers = 2
+batch_size = 16
+batch_size_val = 16
+num_workers = 8
 lr = 0.0002
 max_epoch = 100
 root_dir = '../ACDC-2D-All'
