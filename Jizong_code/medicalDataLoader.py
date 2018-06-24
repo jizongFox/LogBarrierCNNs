@@ -10,7 +10,7 @@ from PIL import Image, ImageOps
 from random import random, randint
 
 root_dir = '../ACDC-2D-All'
-batch_size = 4
+batch_size = 1
 num_workers = 4
 
 transform = transforms.Compose([
@@ -105,7 +105,7 @@ class MedicalImageDataset(Dataset):
 
     def __len__(self):
         return len(self.imgs)
-
+        # return 1
     def augment(self, img, mask, weak_mask):
         if random() > 0.5:
             img = ImageOps.flip(img)
@@ -142,7 +142,7 @@ class MedicalImageDataset(Dataset):
             # mask = self.mask_pixelvalue2OneHot(mask)
             mask_weak = self.mask_transform(mask_weak)
 
-        return [img, mask, mask_weak, img_path]
+        return [img, mask.long(), mask_weak.long(), img_path]
 
     def mask_pixelvalue2OneHot(self,mask):
         possible_pixel_values = [0.000000, 0.33333334, 0.66666669, 1.000000]

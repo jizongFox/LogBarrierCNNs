@@ -6,8 +6,10 @@ from visdom import Visdom
 
 class Dashboard:
 
-    def __init__(self, port=8097):
-        self.vis = Visdom(port=port,server='http://turing.livia.etsmtl.ca',env='LogBarrer')
+    def __init__(self, server='http://turing.livia.etsmtl.ca',port=8097,env='default'):
+        self.vis = Visdom(port=port,server=server,env=env)
+        self.index = {}
+        self.log_text = ''
 
     def loss(self, losses, title):
         x = np.arange(1, len(losses)+1, 1)
@@ -22,3 +24,15 @@ class Dashboard:
         image = image.numpy()
 
         self.vis.image(image.astype(np.float), env=self.vis.env, opts=dict(title=title))
+
+    def plot(self, name, y):
+        """
+        self.plot('loss',1.00)
+        """
+        x = self.index.get(name, 0)
+        self.vis.line(Y=np.array([y]), X=np.array([x]),
+                      win=name,
+                      opts=dict(title=name),
+                      update=None if x == 0 else 'append'
+                      )
+        self.index[name] = x + 1

@@ -239,10 +239,13 @@ class SegNet(nn.Module):
         self.dec4 = nn.Sequential(*decoders[17:24])
         self.dec5 = nn.Sequential(*decoders[24:])
 
+        #for 1D images#
+        self.dec1._modules['0']= nn.Conv2d(1,64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+
         # gives better results
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                m.requires_grad = False
+        # for m in self.modules():
+        #     if isinstance(m, nn.Conv2d):
+        #         m.requires_grad = False
 
         self.enc5 = SegNetEnc(512, 512, 1)
         self.enc4 = SegNetEnc(1024, 256, 1)
