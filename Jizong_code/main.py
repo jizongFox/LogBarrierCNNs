@@ -17,10 +17,10 @@ board_image = Dashboard(server='http://turing.livia.etsmtl.ca',env="image")
 board_loss = Dashboard(server='http://turing.livia.etsmtl.ca',env="loss")
 
 cuda_device = "0"
-batch_size = 16
-batch_size_val = 16
+batch_size = 1
+batch_size_val = 1
 num_workers = 16
-lr = 0.001
+lr = 0.0002
 max_epoch = 100
 root_dir = '../ACDC-2D-All'
 model_dir = 'model'
@@ -33,7 +33,7 @@ transform = transforms.Compose([
 mask_transform = transforms.Compose([
     transforms.ToTensor()
 ])
-train_set = medicalDataLoader.MedicalImageDataset('train',root_dir,transform=transform,mask_transform=mask_transform,augment=False,equalize=False)
+train_set = medicalDataLoader.MedicalImageDataset('train',root_dir,transform=transform,mask_transform=mask_transform,augment=True,equalize=False)
 train_loader = DataLoader(train_set,batch_size=batch_size,num_workers=num_workers,shuffle=True,drop_last=False)
 
 val_set = medicalDataLoader.MedicalImageDataset('val',root_dir,transform=transform,mask_transform=mask_transform,equalize=False)
@@ -58,7 +58,7 @@ def val():
     dice_loss_meter=AverageValueMeter()
     dice_loss_meter.reset()
     for i, (img, mask, weak_mask, _) in enumerate(val_loader):
-        if (weak_mask.sum() == 0) or (mask.sum() == 0):
+        if (weak_mask.sum() <= 3) or (mask.sum() <=10):
             # print('No mask has been found')
             continue
         img, mask, weak_mask = img.cuda(), mask.cuda(),weak_mask.cuda()
@@ -68,7 +68,7 @@ def val():
         diceloss= dice_loss(segm,mask)
         dice_loss_meter.add(diceloss.item())
 
-        if i % 10 == 0:
+        if i % 100 == 0:
 
             board_image.image(img[0], 'medical image')
             board_image.image(color_transform(weak_mask[0]), 'weak_mask')
@@ -113,7 +113,7 @@ def train ():
             loss = loss_ce+loss_size
             totalloss_meter.add(loss.item())
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(net.parameters(), 1e-3)
+            torch.nn.utils.clip_grad_norm_(net.parameters(), 1e-4)
             optimiser.step()
         #     if i %50==0:
         #         predict_ = F.softmax(predict, dim=1)
