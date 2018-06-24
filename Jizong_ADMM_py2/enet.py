@@ -4,7 +4,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
-
 class InitialBlock(nn.Module):
     '''
     The initial block for Enet has 2 branches: The convolution branch and
@@ -240,3 +239,7 @@ class Enet(nn.Module):
         output, pooling_stack = self.encoder(input)
         output = self.decoder(output, pooling_stack)
         return output
+
+
+if __name__ =="__main__":
+    net = Enet(2)
