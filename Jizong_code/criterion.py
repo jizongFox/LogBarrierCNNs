@@ -21,7 +21,7 @@ class partialCrossEntropyLoss2d(nn.Module):
         elementwise_loss = self.loss(F.log_softmax(outputs,dim=1), targets)
         partialLossMask = targets.data.float()
         if partialLossMask.sum()==0:
-            print()
+            pass
         partialLoss  = (elementwise_loss * partialLossMask ).sum()/targets.data.sum().float()
 
         return partialLoss
