@@ -1,4 +1,6 @@
 import numpy as np
+import torch, torch.nn as nn
+from criterion import CrossEntropyLoss2d
 from medpy.io import load, header
 from medpy.graphcut.generate import graph_from_labels, graph_from_voxels
 from medpy.graphcut.energy_voxel import boundary_difference_exponential, boundary_maximum_exponential
@@ -87,3 +89,25 @@ def graphcut3D(im, hm, lamda, sigma, eps=1e-10, pWeightMax=None):
     #     for coo in rp.coords:
     #         result_image_data[coo[0], coo[1],i] = 1
     return result_image_data
+
+
+def update_theta(f_theta_labeled,f_theta_unlabeled,gamma,s, u, v):
+    global u_r,u_s,net
+    global labeled_img, labeled_mask, labeled_weak_mask, unlabeled_img, unlabeled_mask
+    optimiser = torch.optim.Adam(net.parameters(),lr=1e-3)
+    criterion = CrossEntropyLoss2d()
+    for i in xrange(10):
+
+        loss_labeled = criterion(f_theta_labeled,labeled_mask.squeeze(1))
+        loss_unlabeled = u_r * (f_theta_unlabeled - gamma.float() + torch.Tensor(u)).norm(p=2)+\
+                         u_s * (f_theta_unlabeled-s+v).norm(p=2)
+        loss = loss_labeled + loss_unlabeled
+        optimiser.zero_grad()
+        loss.backward()
+        optimiser.step()
+
+        f_theta_labeled = net(labeled_img)  # shape b,c,w,h
+        f_theta_unlabeled = net(unlabeled_img)
+
+    return f_theta_labeled,f_theta_unlabeled
+
