@@ -26,7 +26,7 @@ max_epoch = 100
 root_dir = '../ACDC-2D-All'
 model_dir = 'model'
 size_min = 5
-size_max = 2000
+size_max = 20
 
 cuda_device = "0"
 os.environ["CUDA_VISIBLE_DEVICES"] = cuda_device
@@ -96,6 +96,8 @@ def main():
         f_theta_labeled, f_theta_unlabeled = update_theta(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v, )
         gamma = update_gamma(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v)
         s = update_s(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v)
+        u = update_u(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v)
+        v = update_v(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v)
 
 
 def update_theta(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v):
@@ -141,11 +143,23 @@ def update_s(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v):
         si = a[i]
         A_plus = (si >= 0).sum()
         A_sub = (si < 0).sum()
-
-        if si.sum() >= size_max:
-            pass
+        if A_plus >= size_max:
+            threshold = np.sort(si.reshape(-1))[size_max:][0]
+            s_new[i][np.where(si>threshold)]=1
         else:
-            pass
+            s_new[i,:,:][np.where(si<0)]=1
+    return s_new
+
+def update_u(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v):
+    u = u+ f_theta_unlabeled.data.cpu().numpy()[:,1:,:] - gamma
+    return u
+def update_v(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v):
+    v = v+ f_theta_unlabeled.data.cpu().numpy()[:,1:,:] - s
+    return v
+
+
+
+
 
 
 if __name__ == "__main__":
