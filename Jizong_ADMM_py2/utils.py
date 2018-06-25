@@ -65,10 +65,22 @@ class Colorize:
         return color_image
 
 
-def show_image_mask(img,mask):
+def show_image_mask(*args):
+    imgs = [x for x in args if type(x)!= str]
+    title = [x for x in args if type(x)==str]
+    num = len(imgs)
     plt.figure()
-    plt.imshow(img.cpu().data.numpy().squeeze())
+    if len(title)>=1:
+        plt.title(title[0])
+
+    for i in range(num):
+        plt.subplot(1,num,i+1)
+        try:
+            plt.imshow(imgs[i].cpu().data.numpy().squeeze())
+        except:
+            plt.imshow(imgs[i].squeeze())
+    plt.tight_layout()
+
     plt.show()
-    plt.figure()
-    plt.imshow(mask.cpu().data.numpy().squeeze())
-    plt.show()
+
+

@@ -11,6 +11,9 @@ from tqdm import tqdm
 from torchnet.meter import AverageValueMeter
 from utils import pred2segmentation,dice_loss,Colorize,show_image_mask
 from visualize import Dashboard
+from utils_graphcuts import graphcut3D
+
+
 from pretrain_network import pretrain
 # import logging
 # import inspect
@@ -60,18 +63,60 @@ val_loader = DataLoader(val_set, batch_size=batch_size_val, num_workers=num_work
 ##=====================================================================================================================#
 # np.random.choice(labeled_dataset)
 
-net = Enet(2).to(device)
-# path_to_save ='checkpoint/pretrained_Enet'
+net = Enet(2)
+
+## Uncomment the following line to pretrain the model with few fully labeled data.
 # pretrain(labeled_dataLoader,net,)
-net.load_state_dict(torch.load('checkpoint/pretrained_net.pth'))
+
+map_location = lambda  storage, loc: storage
+net.load_state_dict(torch.load('checkpoint/pretrained_net.pth',map_location=map_location))
+net.to(device)
 optimiser = torch.optim.Adam(net.parameters(),lr = lr, weight_decay=1e-5)
+
+
+'''
+Initialize the ADMM dummy variables
+'''
+
+
+
+
+
+
+"""
+Finalise the initialization of ADMM dummy variable
+"""
+
+
 
 for iteration in xrange(10000):
 
     ## choose randomly a image from labeled dataset and unlabeled dataset.
     labeled_dataLoader, unlabeled_dataLoader = iter(labeled_dataLoader), iter(unlabeled_dataLoader)
     labeled_img,labeled_mask, labeled_weak_mask = next(labeled_dataLoader)[0:3]
-    unlabeled_img = next(unlabeled_dataLoader)[0]
+    unlabeled_img,unlabeled_mask = next(unlabeled_dataLoader)[0:2]
+    if labeled_mask.sum()==0 or unlabeled_mask.sum()==0:
+        continue
+
+    f_theta_labeled = net(labeled_img)
+    f_theta_unlabeled = net(unlabeled_img)
+
+    gamma = pred2segmentation(f_theta_unlabeled)
+    s = gamma
+
+
+    # show_image_mask(labeled_img,labeled_mask,labeled_segm,'Labeled data')
+
+    # unlabeled_prediction = net(unlabeled_img)
+    # unlabeled_segmentation = pred2segmentation(unlabeled_prediction)
+    # show_image_mask(unlabeled_img,unlabeled_segmentation,unlabeled_mask,'Unlabeled data')
+    #
+    # cut_seg = graphcut3D(unlabeled_img,unlabeled_prediction,None,50.)
+    #
+    #
+    # show_image_mask(unlabeled_img,unlabeled_mask,unlabeled_segmentation,cut_seg)
+    # print
+
 
 
 

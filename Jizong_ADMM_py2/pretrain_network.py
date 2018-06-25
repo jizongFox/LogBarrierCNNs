@@ -3,8 +3,8 @@ import torch.nn as nn
 from tqdm import tqdm
 from torchnet.meter import AverageValueMeter
 from criterion import  CrossEntropyLoss2d
-use_gpu = True
-device = "cuda" if torch.cuda.is_available() and use_gpu else "cpu"
+
+device = "cuda" if torch.cuda.is_available()  else "cpu"
 
 def pretrain(dataloader, network, path=None):
     class config:
@@ -16,6 +16,7 @@ def pretrain(dataloader, network, path=None):
     pretrain_config = config()
     if path :
         pretrain_config.path = path
+    network.to(device)
     criterion_ = CrossEntropyLoss2d()
     optimiser_ = torch.optim.Adam(network.parameters(),pretrain_config.lr)
     loss_meter = AverageValueMeter()
