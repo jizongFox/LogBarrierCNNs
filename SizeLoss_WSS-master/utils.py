@@ -211,7 +211,9 @@ def inference(net, temperature, img_batch, batch_size, epoch, deepSupervision, m
             if sizePredNumpy > 0:
                 out = torch.cat((MRI, pred_y[:, 1, :, :].view(1, 1, 256, 256), Segmentation))
                 name2save = img_names[0].split('./ACDC-2D-All/val/Img/')
-                name2save = name2save[1].split('.png')
+                # import ipdb
+                # ipdb.set_trace()
+                name2save = name2save[0].split('.png')
                 torchvision.utils.save_image(out.data, os.path.join(directory, name2save[0]+'_'+str(sizePredNumpy)+'.png'),
                                              nrow=batch_size,
                                              padding=2,

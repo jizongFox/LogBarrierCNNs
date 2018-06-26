@@ -11,6 +11,7 @@ from criterion import CrossEntropyLoss2d
 from enet import Enet
 from utils import pred2segmentation, Colorize
 from visualize import Dashboard
+from  utils import show_image_mask
 
 board_image = Dashboard(server='http://turing.livia.etsmtl.ca', env="ADMM_image")
 board_loss = Dashboard(server='http://turing.livia.etsmtl.ca', env="ADMM_loss")
@@ -119,18 +120,37 @@ def update_theta(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v):
 
     return f_theta_labeled, f_theta_unlabeled
 
-
+import maxflow
 def update_gamma(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v):
     global u_r, u_s, net
     global labeled_img, labeled_mask, labeled_weak_mask, unlabeled_img, unlabeled_mask
 
-    unary_term = np.multiply((0.5 - (f_theta_unlabeled.data.numpy()[:, 1, :, :] + u)),
+    unary_term_gamma_1 = np.multiply((0.5 - (f_theta_unlabeled.data.numpy()[:, 1, :, :] + u)),
                              unlabeled_img.data.numpy().squeeze(1))
-    neighbor_term = None
+    unary_term_gamma_0 =np.zeros(unary_term_gamma_1.shape)
+    neighbor_term = 0.1
+    new_gamma = np.zeros(gamma.shape)
+
+    for i in xrange(unary_term_gamma_1.shape[0]):
+        g = maxflow.Graph[int](0, 0)
+        # Add the nodes.
+        nodeids = g.add_grid_nodes(gamma.shape)
+        # Add edges with the same capacities.
+        g.add_grid_edges(nodeids, neighbor_term)
+        # Add the terminal edges.
+        g.add_grid_tedges(nodeids, unary_term_gamma_1, unary_term_gamma_0)
+        g.maxflow()
+        # Get the segments.
+        sgm = g.get_grid_segments(nodeids)*1
+
+        # The labels should be 1 where sgm is False and 0 otherwise.
+        new_gamma[i] = np.int_(np.logical_not(sgm))
+
+
 
     # it seems to set the unary and neighbor term of one function, one can have the result automatically.
     # In python, I failed to find the package.
-    return gamma
+    return new_gamma
 
 
 def update_s(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v):
@@ -145,21 +165,20 @@ def update_s(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v):
         A_sub = (si < 0).sum()
         if A_plus >= size_max:
             threshold = np.sort(si.reshape(-1))[size_max:][0]
-            s_new[i][np.where(si>threshold)]=1
+            s_new[i][np.where(si > threshold)] = 1
         else:
-            s_new[i,:,:][np.where(si<0)]=1
+            s_new[i, :, :][np.where(si < 0)] = 1
     return s_new
 
+
 def update_u(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v):
-    u = u+ f_theta_unlabeled.data.cpu().numpy()[:,1:,:] - gamma
+    u = u + f_theta_unlabeled.data.cpu().numpy()[:, 1:, :] - gamma
     return u
+
+
 def update_v(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v):
-    v = v+ f_theta_unlabeled.data.cpu().numpy()[:,1:,:] - s
+    v = v + f_theta_unlabeled.data.cpu().numpy()[:, 1:, :] - s
     return v
-
-
-
-
 
 
 if __name__ == "__main__":
