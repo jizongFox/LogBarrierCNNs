@@ -80,7 +80,6 @@ def show_image_mask(*args):
         except:
             plt.imshow(imgs[i].squeeze())
     plt.tight_layout()
-
     plt.show()
 
 

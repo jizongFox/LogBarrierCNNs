@@ -12,6 +12,7 @@ from enet import Enet
 from utils import pred2segmentation, Colorize
 from visualize import Dashboard
 from  utils import show_image_mask
+from pretrain_network import pretrain
 
 board_image = Dashboard(server='http://turing.livia.etsmtl.ca', env="ADMM_image")
 board_loss = Dashboard(server='http://turing.livia.etsmtl.ca', env="ADMM_loss")
@@ -88,17 +89,22 @@ def main():
         f_theta_unlabeled = net(unlabeled_img)  # b,c,w,h
         gamma = pred2segmentation(f_theta_unlabeled).detach()  # b, w, h
         s = gamma  # b w h
-        u = np.random.randn(*list(gamma.shape))  # b w h
-        v = np.random.randn(*u.shape)  # b w h
+        u = np.zeros(list(gamma.shape))  # b w h
+        v = np.zeros(u.shape)  # b w h
         global u_r, u_s
         u_r = 1
         u_s = 1
-        # Finalise the initialization of ADMM dummy variable
-        f_theta_labeled, f_theta_unlabeled = update_theta(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v, )
-        gamma = update_gamma(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v)
-        s = update_s(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v)
-        u = update_u(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v)
-        v = update_v(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v)
+
+        for i in xrange(200):
+            # Finalise the initialization of ADMM dummy variable
+            f_theta_labeled, f_theta_unlabeled = update_theta(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v, )
+            gamma = update_gamma(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v)
+            s = update_s(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v)
+            u = update_u(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v)
+            v = update_v(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v)
+
+            show_image_mask(labeled_img,labeled_mask,f_theta_labeled[:,1,:,:])
+            show_image_mask(unlabeled_img,unlabeled_mask,f_theta_unlabeled[:,1,:,:])
 
 
 def update_theta(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v):
@@ -108,7 +114,7 @@ def update_theta(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v):
     criterion = CrossEntropyLoss2d()
     for i in xrange(10):
         loss_labeled = criterion(f_theta_labeled, labeled_mask.squeeze(1))
-        loss_unlabeled = u_r * (f_theta_unlabeled - gamma.float() + torch.Tensor(u)).norm(p=2) + \
+        loss_unlabeled = u_r * (f_theta_unlabeled - gamma.float() + torch.Tensor(u).float()).norm(p=2) + \
                          u_s * (f_theta_unlabeled - s.float() + torch.Tensor(v)).norm(p=2)
         loss = loss_labeled + loss_unlabeled
         optimiser.zero_grad()
@@ -132,25 +138,27 @@ def update_gamma(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v):
     new_gamma = np.zeros(gamma.shape)
 
     for i in xrange(unary_term_gamma_1.shape[0]):
-        g = maxflow.Graph[int](0, 0)
+        g = maxflow.Graph[float](0, 0)
         # Add the nodes.
-        nodeids = g.add_grid_nodes(gamma.shape)
+        nodeids = g.add_grid_nodes(list(gamma.shape)[1:])
         # Add edges with the same capacities.
         g.add_grid_edges(nodeids, neighbor_term)
         # Add the terminal edges.
-        g.add_grid_tedges(nodeids, unary_term_gamma_1, unary_term_gamma_0)
+        g.add_grid_tedges(nodeids, unary_term_gamma_1[i].astype(np.int32), unary_term_gamma_0[i])
         g.maxflow()
         # Get the segments.
         sgm = g.get_grid_segments(nodeids)*1
 
         # The labels should be 1 where sgm is False and 0 otherwise.
         new_gamma[i] = np.int_(np.logical_not(sgm))
+        del g
+
 
 
 
     # it seems to set the unary and neighbor term of one function, one can have the result automatically.
     # In python, I failed to find the package.
-    return new_gamma
+    return torch.Tensor(new_gamma).float()
 
 
 def update_s(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v):
@@ -168,16 +176,16 @@ def update_s(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v):
             s_new[i][np.where(si > threshold)] = 1
         else:
             s_new[i, :, :][np.where(si < 0)] = 1
-    return s_new
+    return torch.Tensor(s_new).float()
 
 
 def update_u(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v):
-    u = u + f_theta_unlabeled.data.cpu().numpy()[:, 1:, :] - gamma
+    u = u + f_theta_unlabeled.data.cpu().numpy()[:, 1:, :] - gamma.data.cpu().numpy()
     return u
 
 
 def update_v(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v):
-    v = v + f_theta_unlabeled.data.cpu().numpy()[:, 1:, :] - s
+    v = v + f_theta_unlabeled.data.cpu().numpy()[:, 1:, :] - s.data.cpu().numpy()
     return v
 
 

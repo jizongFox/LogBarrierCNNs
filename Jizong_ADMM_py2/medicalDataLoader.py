@@ -15,9 +15,11 @@ batch_size = 4
 num_workers = 4
 
 transform = transforms.Compose([
+    transforms.Resize(128,128),
     transforms.ToTensor()
 ])
 mask_transform = transforms.Compose([
+    transforms.Resize(128, 128),
     transforms.ToTensor()
 ])
 
