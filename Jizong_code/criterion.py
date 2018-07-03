@@ -13,12 +13,12 @@ class CrossEntropyLoss2d(nn.Module):
         return self.loss(F.log_softmax(outputs,dim=1), targets)
 
 class partialCrossEntropyLoss2d(nn.Module):
-    def __init__(self, weight):
+    def __init__(self, weight,temperature = 1):
         super().__init__()
-
+        self.temporature = temperature
         self.loss = nn.NLLLoss(weight, reduce=False, size_average=False)
     def forward(self, outputs, targets):
-        elementwise_loss = self.loss(F.log_softmax(outputs,dim=1), targets)
+        elementwise_loss = self.loss(F.log_softmax(outputs/self.temporature,dim=1), targets)
         partialLossMask = targets.data.float()
         if partialLossMask.sum()==0:
             pass

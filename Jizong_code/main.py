@@ -51,7 +51,7 @@ optimiser = torch.optim.Adam(net.parameters(), lr=lr)
 weight = torch.ones(num_classes)
 # weight[0]=0
 # criterion = CrossEntropyLoss2d(weight.cuda(),reduce=False, size_average=False).cuda()
-partialCECriterion = partialCrossEntropyLoss2d(weight.cuda())
+partialCECriterion = partialCrossEntropyLoss2d(weight.cuda(),temperature=0.1)
 sizeCriterion = logBarrierLoss(0, 1700)
 global highest_dice_loss
 highest_dice_loss = 0
