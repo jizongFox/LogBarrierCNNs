@@ -18,7 +18,7 @@ class InitialBlock(nn.Module):
 
     def __init__(self):
         super(InitialBlock, self).__init__()
-        self.conv = nn.Conv2d(3, 13, (3, 3), stride=2, padding=1)
+        self.conv = nn.Conv2d(1, 13, (3, 3), stride=2, padding=1)
         self.batch_norm = nn.BatchNorm2d(13, 1e-3)
         self.prelu = nn.PReLU(13)
         self.pool = nn.MaxPool2d(2, stride=2)
@@ -168,7 +168,7 @@ class Encoder(nn.Module):
         super(Encoder, self).__init__()
         layers = []
         layers.append(InitialBlock())
-        layers.append(BottleNeck(16, 64, regularlizer_prob=0.01,
+        layers.append(BottleNeck(14, 64, regularlizer_prob=0.01,
                                  downsampling=True))
         for i in range(4):
             layers.append(BottleNeck(64, 64, regularlizer_prob=0.01))
@@ -213,9 +213,9 @@ class Decoder(nn.Module):
         layers.append(BottleNeck(64, 64, use_relu=True))
 
         # Section 5
-        layers.append(BottleNeck(64, 16, upsampling=True, use_relu=True))
-        layers.append(BottleNeck(16, 16, use_relu=True))
-        layers.append(nn.ConvTranspose2d(16, num_classes, 2, stride=2))
+        layers.append(BottleNeck(64, 14, upsampling=True, use_relu=True))
+        layers.append(BottleNeck(14, 14, use_relu=True))
+        layers.append(nn.ConvTranspose2d(14, num_classes, 2, stride=2))
 
         self.layers = nn.ModuleList([layer for layer in layers])
 

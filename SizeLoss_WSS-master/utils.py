@@ -151,6 +151,8 @@ def inference(net, temperature, img_batch, batch_size, epoch, deepSupervision, m
     for i, data in enumerate(img_batch):
         printProgressBar(i, total, prefix="[Inference] Getting segmentations...", length=30)
         image, labels, labels_weak, img_names = data
+        if not(list(image.shape[-2:])==list(labels.shape[-2:])):
+            continue
         img_names_ALL.append(img_names[0].split('/')[-1].split('.')[0])
 
         MRI = to_var(image)
@@ -185,7 +187,7 @@ def inference(net, temperature, img_batch, batch_size, epoch, deepSupervision, m
         if sizeLV_GT > 0:
             if sizePredNumpy < minSize:
                 out = torch.cat((MRI, pred_y[:, 1, :, :].view(1, 1, 256, 256), Segmentation))
-                name2save = img_names[0].split('./ACDC-2D-All/val/Img/')
+                name2save = img_names[0].split('/ACDC-2D-All/val/Img/')
                 name2save = name2save[1].split('.png')
                 torchvision.utils.save_image(out.data, os.path.join(directory, name2save[0]+'_Lower_'+str(minSize-sizePredNumpy)+'.png'),
                                              nrow=batch_size,
@@ -197,7 +199,9 @@ def inference(net, temperature, img_batch, batch_size, epoch, deepSupervision, m
 
             if sizePredNumpy > maxSize:
                 out = torch.cat((MRI, pred_y[:, 1, :, :].view(1, 1, 256, 256), Segmentation))
-                name2save = img_names[0].split('./ACDC-2D-All/val/Img/')
+                name2save = img_names[0].split('/ACDC-2D-All/val/Img/')
+                # import ipdb
+                # ipdb.set_trace()
                 name2save = name2save[1].split('.png')
                 torchvision.utils.save_image(out.data, os.path.join(directory, name2save[0]+'_Upper_'+str(sizePredNumpy-maxSize)+'.png'),
                                              nrow=batch_size,

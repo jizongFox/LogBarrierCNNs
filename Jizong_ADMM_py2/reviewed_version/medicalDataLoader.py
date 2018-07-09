@@ -1,3 +1,4 @@
+#coding=utf8
 from __future__ import print_function, division
 import os
 import torch
@@ -10,13 +11,15 @@ from PIL import Image, ImageOps
 from random import random, randint
 
 root_dir = '../ACDC-2D-All'
-batch_size = 1
+batch_size = 4
 num_workers = 4
 
 transform = transforms.Compose([
+    transforms.Resize(128,128),
     transforms.ToTensor()
 ])
 mask_transform = transforms.Compose([
+    transforms.Resize(128, 128),
     transforms.ToTensor()
 ])
 
@@ -24,6 +27,7 @@ mask_transform = transforms.Compose([
 def make_dataset(root, mode):
     assert mode in ['train', 'val', 'test']
     items = []
+
     if mode == 'train':
         train_img_path = os.path.join(root, 'train', 'Img')
         train_mask_path = os.path.join(root, 'train', 'GT')
@@ -32,7 +36,6 @@ def make_dataset(root, mode):
         images = os.listdir(train_img_path)
         labels = os.listdir(train_mask_path)
         labels_weak = os.listdir(train_mask_weak_path)
-
         images.sort()
         labels.sort()
         labels_weak.sort()
@@ -105,7 +108,7 @@ class MedicalImageDataset(Dataset):
 
     def __len__(self):
         return len(self.imgs)
-        # return 1
+
     def augment(self, img, mask, weak_mask):
         if random() > 0.5:
             img = ImageOps.flip(img)
@@ -125,7 +128,7 @@ class MedicalImageDataset(Dataset):
     def __getitem__(self, index):
         img_path, mask_path, mask_weak_path = self.imgs[index]
         # print("{} and {}".format(img_path,mask_path))
-        img = Image.open(img_path).convert('L')  # .convert('RGB')
+        img = Image.open(img_path)  # .convert('RGB')
         mask = Image.open(mask_path)  # .convert('RGB')
         mask_weak = Image.open(mask_weak_path).convert('L')
         
@@ -142,7 +145,7 @@ class MedicalImageDataset(Dataset):
             # mask = self.mask_pixelvalue2OneHot(mask)
             mask_weak = self.mask_transform(mask_weak)
 
-        return [img, mask.long(), mask_weak.long(), img_path]
+        return [img, mask, mask_weak, img_path]
 
     def mask_pixelvalue2OneHot(self,mask):
         possible_pixel_values = [0.000000, 0.33333334, 0.66666669, 1.000000]

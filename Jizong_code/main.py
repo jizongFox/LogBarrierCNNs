@@ -15,13 +15,14 @@ from torchnet.meter import AverageValueMeter
 from Jizong_code.utils import pred2segmentation, dice_loss, Colorize
 from Jizong_code.visualize import Dashboard
 
-board_image = Dashboard(server='http://turing.livia.etsmtl.ca', env="image")
+board_train_image = Dashboard(server='http://turing.livia.etsmtl.ca', env="train_image")
+board_val_image = Dashboard(server='http://turing.livia.etsmtl.ca', env="vali_image")
 board_loss = Dashboard(server='http://turing.livia.etsmtl.ca', env="loss")
 
 cuda_device = "0"
 batch_size = 1
 batch_size_val = 1
-num_workers = 16
+num_workers = 0
 lr = 0.0002
 max_epoch = 100
 root_dir = '../ACDC-2D-All'
@@ -51,9 +52,10 @@ optimiser = torch.optim.Adam(net.parameters(), lr=lr)
 weight = torch.ones(num_classes)
 # weight[0]=0
 # criterion = CrossEntropyLoss2d(weight.cuda(),reduce=False, size_average=False).cuda()
-partialCECriterion = partialCrossEntropyLoss2d(weight.cuda(),temperature=0.1)
-sizeCriterion = logBarrierLoss(0, 1700)
-global highest_dice_loss
+partialCECriterion = partialCrossEntropyLoss2d(weight.cuda(), temperature=0.1)
+
+sizeCriterion = logBarrierLoss(97.9, 1722.6)
+
 highest_dice_loss = 0
 
 
@@ -65,17 +67,21 @@ def val():
         if (weak_mask.sum() <= 3) or (mask.sum() <= 10):
             # print('No mask has been found')
             continue
+        if not ((list(img.shape[-2:]) == list(mask.shape[-2:])) and (
+                list(img.shape[-2:]) == list(weak_mask.shape[-2:]))):
+            continue
         img, mask, weak_mask = img.cuda(), mask.cuda(), weak_mask.cuda()
 
         predict_ = F.softmax(net(img), dim=1)
         segm = pred2segmentation(predict_)
-        diceloss = dice_loss(segm, mask)
-        dice_loss_meter.add(diceloss.item())
+        diceloss_F = dice_loss(segm, mask)
+        diceloss_B = dice_loss(1 - segm, 1 - mask)
+        dice_loss_meter.add((diceloss_F + diceloss_B).item() / 2)
 
         if i % 100 == 0:
-            board_image.image(img[0], 'medical image')
-            board_image.image(color_transform(weak_mask[0]), 'weak_mask')
-            board_image.image(color_transform(segm[0]), 'prediction')
+            board_val_image.image(img[0], 'medical image')
+            board_val_image.image(color_transform(weak_mask[0]), 'weak_mask')
+            board_val_image.image(color_transform(segm[0]), 'prediction')
     board_loss.plot('dice_loss for validationset', dice_loss_meter.value()[0])
 
     if dice_loss_meter.value()[0] > highest_dice_loss:
@@ -104,6 +110,9 @@ def train():
             if (weak_mask.sum() == 0) or (mask.sum() == 0):
                 # print('No mask has been found')
                 continue
+            if not ((list(img.shape[-2:]) == list(mask.shape[-2:])) and (
+                    list(img.shape[-2:]) == list(weak_mask.shape[-2:]))):
+                continue
             img, mask, weak_mask = img.cuda(), mask.cuda(), weak_mask.cuda()
             optimiser.zero_grad()
             predict = net(img)
@@ -118,19 +127,24 @@ def train():
             loss.backward()
             torch.nn.utils.clip_grad_norm_(net.parameters(), 1e-4)
             optimiser.step()
-        #     if i %50==0:
-        #         predict_ = F.softmax(predict, dim=1)
-        #         segm = pred2segmentation(predict)
-        #         print("ce_loss:%.2f,  size_loss:%.2f ,FB percentage:%.2f"%(loss_ce.item(),loss_size.item(),((predict_[:, 1, :, :]*weak_mask.data.float()).sum()/weak_mask.data.float().sum()).item()))
-        #         board_image.image(img[0],'medical image')
-        #         board_image.image(color_transform(mask[0]),'weak_mask')
-        #         board_image.image(color_transform(weak_mask[0]),'weak_mask')
-        #         board_image.image(color_transform(segm[0]),'prediction')
-        #         if totalloss_meter.value()[0] < 1:
-        #             board_loss.plot('ce_loss', -np.log(loss_ce.item()+1e-6))
-        #             board_loss.plot('size_loss', -np.log(loss_size.item()+1e-6))
-        #             # board_loss.plot('size_loss', -np.log(sizeloss_meter.value()[0]))
-        # # print('train loss:%.5f'%celoss_meter.value()[0])
+            if i % 50 == 0:
+                predict_ = F.softmax(predict, dim=1)
+                segm = pred2segmentation(predict)
+                print("ce_loss:%.4f,  size_loss:%.4f, FB percentage:%.2f" % (loss_ce.item(), loss_size.item(), ((
+                                                                                                                            predict_[
+                                                                                                                            :,
+                                                                                                                            1,
+                                                                                                                            :,
+                                                                                                                            :] * weak_mask.data.float()).sum() / weak_mask.data.float().sum()).item()))
+                board_train_image.image(img[0], 'medical image')
+                board_train_image.image(color_transform(mask[0]), 'weak_mask')
+                board_train_image.image(color_transform(weak_mask[0]), 'weak_mask')
+                board_train_image.image(color_transform(segm[0]), 'prediction')
+                if totalloss_meter.value()[0] < 1:
+                    board_loss.plot('ce_loss', -np.log(loss_ce.item() + 1e-6))
+                    board_loss.plot('size_loss', -np.log(loss_size.item() + 1e-6))
+                    # board_loss.plot('size_loss', -np.log(sizeloss_meter.value()[0]))
+        # print('train loss:%.5f'%celoss_meter.value()[0])
         val()
 
 

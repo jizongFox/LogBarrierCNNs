@@ -2,6 +2,7 @@
 
 import os
 
+os.environ['CUDA_VISIBLE_DEVICES'] = "3"
 import torch
 import numpy as np
 from torch import nn
@@ -18,7 +19,7 @@ from losses import Partial_CE, MIL_Loss, Size_Loss
 
 def weights_init(m):
     if type(m) == nn.Conv2d or type(m) == nn.ConvTranspose2d:
-        nn.init.xavier_normal(m.weight.data)
+        nn.init.xavier_normal_(m.weight.data)
     elif type(m) == nn.BatchNorm2d:
         m.weight.data.normal_(1.0, 0.02)
         m.bias.data.fill_(0)
@@ -43,7 +44,7 @@ def runTraining():
     lr = 0.0005
     epoch = 1000
 
-    root_dir = '/home/AN96120/pythonProject/Idea for ADMM/LogBarrierCNNs/ACDC-2D-All'
+    root_dir = '/home/AN96120/python_project/LogBarrierCNNs/ACDC-2D-All'
     model_dir = 'model'
 
     transform = transforms.Compose([
@@ -58,12 +59,12 @@ def runTraining():
                                                       root_dir,
                                                       transform=transform,
                                                       mask_transform=mask_transform,
-                                                      augment=False,
-                                                      equalize=False)
+                                                      augment=True,
+                                                      equalize=True)
 
     train_loader = DataLoader(train_set,
                               batch_size=batch_size,
-                              num_workers=5,
+                              num_workers=2,
                               shuffle=False)
 
     val_set = medicalDataLoader.MedicalImageDataset('val',
@@ -74,7 +75,7 @@ def runTraining():
 
     val_loader = DataLoader(val_set,
                             batch_size=batch_size_val,
-                            num_workers=5,
+                            num_workers=2,
                             shuffle=False)
 
     minVal = 97.9
@@ -90,7 +91,7 @@ def runTraining():
     netG = ENet(1, num_classes)
 
     netG.apply(weights_init)
-    softMax = nn.Softmax()
+    softMax = nn.Softmax(dim=1)
     Dice_loss = computeDiceOneHotBinary()
 
     modelName = 'WeaklySupervised_CE-2_b'
@@ -142,9 +143,9 @@ def runTraining():
             segmentation_prediction = netG(MRI)
 
             annotatedPixels = annotatedPixels + weak_labels.sum()
-            totalPixels = totalPixels + weak_labels.shape[2]*weak_labels.shape[3]
+            totalPixels = totalPixels + weak_labels.shape[2] * weak_labels.shape[3]
             temperature = 0.1
-            predClass_y = softMax(segmentation_prediction/temperature)
+            predClass_y = softMax(segmentation_prediction / temperature)
             Segmentation_planes = getOneHot_Encoded_Segmentation(Segmentation)
             segmentation_prediction_ones = predToSegmentation(predClass_y)
 

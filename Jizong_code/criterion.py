@@ -35,15 +35,16 @@ class logBarrierLoss(nn.Module):
 
 
     def forward(self, probability):
+        total_pixel_number = list(probability.view(-1).shape)[0]
         if probability.sum(1).mean()!=1:
             probability= F.softmax(probability,dim=1)
         sum_pixels= probability[:,1,:,:].sum(-1).sum(-1)
         loss_t = torch.Tensor([0]).cuda()
         for image in sum_pixels:
             if image>= self.high_band:
-                loss = (image-self.high_band)**2
+                loss = (image-self.high_band)**2/total_pixel_number
             if image <= self.low_band:
-                loss = (sum_pixels - self.low_band) ** 2
+                loss = (sum_pixels - self.low_band) ** 2/total_pixel_number
             if (image>self.low_band) and (image<self.high_band):
                 loss = torch.Tensor([0]).cuda()
             try:

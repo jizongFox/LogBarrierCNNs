@@ -87,7 +87,7 @@ class MedicalImageDataset(Dataset):
         self.equalize = equalize
 
     def __len__(self):
-        return len(self.imgs)
+        return int(len(self.imgs))
 
     def augment(self, img, mask):
         if random() > 0.5:
@@ -105,7 +105,7 @@ class MedicalImageDataset(Dataset):
     def __getitem__(self, index):
         img_path, mask_path, mask_weak_path = self.imgs[index]
         # print("{} and {}".format(img_path,mask_path))
-        img = Image.open(img_path)  # .convert('RGB')
+        img = Image.open(img_path).convert('L')  # .convert('RGB')
         mask = Image.open(mask_path)  # .convert('RGB')
         mask_weak = Image.open(mask_weak_path).convert('L')
 

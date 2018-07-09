@@ -18,7 +18,8 @@ board_image = Dashboard(server='http://turing.livia.etsmtl.ca', env="ADMM_image"
 board_loss = Dashboard(server='http://turing.livia.etsmtl.ca', env="ADMM_loss")
 
 use_gpu = True
-device = "cuda" if torch.cuda.is_available() and use_gpu else "cpu"
+# device = "cuda" if torch.cuda.is_available() and use_gpu else "cpu"
+device =torch.device('cuda')
 
 batch_size = 1
 batch_size_val = 1
@@ -53,7 +54,9 @@ def main():
     unlabeled_dataset = copy.deepcopy(train_set)
     unlabeled_dataset.imgs = [train_set.imgs[x] for x in random_index[int(len(random_index) * split_ratio):]]
     assert set(unlabeled_dataset.imgs) & set(
-        labeled_dataset.imgs) == set(), "there's intersection between labeled and unlabeled training set."
+        labeled_dataset.imgs) == set(), \
+        "there's intersection between labeled and unlabeled training set."
+    
     labeled_dataLoader = DataLoader(labeled_dataset, batch_size=1, num_workers=num_workers, shuffle=True)
     unlabeled_dataLoader = DataLoader(unlabeled_dataset, batch_size=1, num_workers=num_workers, shuffle=True)
     ## Here we terminate the split of labeled and unlabeled data
@@ -81,7 +84,9 @@ def main():
         # Initialize the ADMM dummy variables for one-batch training
         labeled_dataLoader, unlabeled_dataLoader = iter(labeled_dataLoader), iter(unlabeled_dataLoader)
         labeled_img, labeled_mask, labeled_weak_mask = next(labeled_dataLoader)[0:3]
+        labeled_img, labeled_mask, labeled_weak_mask = labeled_img.to(device), labeled_mask.to(device), labeled_weak_mask.to(device)
         unlabeled_img, unlabeled_mask = next(unlabeled_dataLoader)[0:2]
+        unlabeled_img, unlabeled_mask = unlabeled_img.to(device), unlabeled_mask.to(device)
         if labeled_mask.sum() == 0 or unlabeled_mask.sum() == 0:
             # skip those with no foreground masks
             continue
@@ -105,6 +110,7 @@ def main():
 
             show_image_mask(labeled_img,labeled_mask,f_theta_labeled[:,1,:,:])
             show_image_mask(unlabeled_img,unlabeled_mask,f_theta_unlabeled[:,1,:,:])
+            print()
 
 
 def update_theta(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v):
@@ -133,6 +139,7 @@ def update_gamma(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v):
 
     unary_term_gamma_1 = np.multiply((0.5 - (f_theta_unlabeled.data.numpy()[:, 1, :, :] + u)),
                              unlabeled_img.data.numpy().squeeze(1))
+    # unary_term_gamma_1 = np.zeros(unary_term_gamma_1.shape)
     unary_term_gamma_0 =np.zeros(unary_term_gamma_1.shape)
     neighbor_term = 0.1
     new_gamma = np.zeros(gamma.shape)
@@ -144,17 +151,14 @@ def update_gamma(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v):
         # Add edges with the same capacities.
         g.add_grid_edges(nodeids, neighbor_term)
         # Add the terminal edges.
-        g.add_grid_tedges(nodeids, unary_term_gamma_1[i].astype(np.int32), unary_term_gamma_0[i])
+        g.add_grid_tedges(nodeids, unary_term_gamma_1[i].astype(np.int32).squeeze(), unary_term_gamma_0[i].squeeze())
         g.maxflow()
         # Get the segments.
         sgm = g.get_grid_segments(nodeids)*1
 
         # The labels should be 1 where sgm is False and 0 otherwise.
         new_gamma[i] = np.int_(np.logical_not(sgm))
-        del g
-
-
-
+        g.reset()
 
     # it seems to set the unary and neighbor term of one function, one can have the result automatically.
     # In python, I failed to find the package.
@@ -175,9 +179,10 @@ def update_s(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v):
             threshold = np.sort(si.reshape(-1))[size_max:][0]
             s_new[i][np.where(si > threshold)] = 1
         else:
-            s_new[i, :, :][np.where(si < 0)] = 1
-    return torch.Tensor(s_new).float()
-
+            # s_new[i, :, :][np.where(si < 0)] = 1
+            pass
+    # return torch.Tensor(s_new).float()
+    return s
 
 def update_u(f_theta_labeled, f_theta_unlabeled, gamma, s, u, v):
     u = u + f_theta_unlabeled.data.cpu().numpy()[:, 1:, :] - gamma.data.cpu().numpy()
