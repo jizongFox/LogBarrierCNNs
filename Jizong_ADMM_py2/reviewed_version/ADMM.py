@@ -84,8 +84,8 @@ class networks(object):
         # Add edges with the same capacities.
         g.add_grid_edges(nodeids, neighbor_term)
         # Add the terminal edges.
-        g.add_grid_tedges(nodeids, unary_term_gamma_1[i].astype(np.int32).squeeze(),
-                          unary_term_gamma_0[i].squeeze())
+        g.add_grid_tedges(nodeids,
+                          unary_term_gamma_0[i].squeeze(),unary_term_gamma_1[i].astype(np.int32).squeeze())
         g.maxflow()
         # Get the segments.
         sgm = g.get_grid_segments(nodeids) * 1
@@ -133,22 +133,41 @@ class networks(object):
         self.update_v()
 
     def show_labeled_pair(self):
-        plt.figure(1)
-        plt.subplot(1, 3, 1)
-        plt.imshow(self.limage[0].cpu().data.numpy().squeeze())
-        plt.subplot(1, 3, 2)
-        plt.imshow(self.lmask[0].cpu().data.numpy().squeeze())
-        plt.subplot(1, 3, 3)
-        plt.imshow(F.softmax(self.limage_output, dim=1)[0][1].cpu().data.numpy())
+        fig = plt.figure(1,figsize=(8,8))
+
+        ax1 = fig.add_subplot(221)
+        ax1.imshow(self.limage[0].cpu().data.numpy().squeeze())
+        ax1.title.set_text('original image')
+
+        ax2 = fig.add_subplot(222)
+        ax2.imshow(self.lmask[0].cpu().data.numpy().squeeze())
+        ax2.title.set_text('ground truth')
+
+        ax3 = fig.add_subplot(223)
+        ax3.imshow(F.softmax(self.limage_output, dim=1)[0][1].cpu().data.numpy())
+        ax3.title.set_text('prediction of the probability')
+
+
+        ax4 = fig.add_subplot(224)
+        ax4.imshow(np.abs(self.lmask[0].cpu().data.numpy().squeeze()-F.softmax(self.limage_output, dim=1)[0][1].cpu().data.numpy()))
+        ax4.title.set_text('difference')
+
+
         plt.show(block=False)
         plt.pause(0.01)
 
     def show_ublabel_image(self):
-        plt.figure(2)
-        plt.subplot(1, 2, 1)
-        plt.imshow(self.uimage[0].cpu().data.numpy().squeeze())
-        plt.subplot(1, 2, 2)
-        plt.imshow(F.softmax(self.uimage_output, dim=1)[0][1].cpu().data.numpy())
+        fig = plt.figure(2,figsize=(8,4))
+
+        ax1 = fig.add_subplot(121)
+        ax1.imshow(self.uimage[0].cpu().data.numpy().squeeze())
+        ax1.title.set_text('original image')
+
+
+        ax2 = fig.add_subplot(122)
+        ax2.imshow(F.softmax(self.uimage_output, dim=1)[0][1].cpu().data.numpy())
+        ax2.title.set_text('probability prediction')
+
         plt.show(block=False)
         plt.pause(0.01)
 

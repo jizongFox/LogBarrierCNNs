@@ -10,7 +10,7 @@ Unittest for the medpy.graphcut.energy_voxel methods.
 import unittest
 
 # third-party modules
-import numpyx
+import numpy
 from numpy.testing import assert_array_equal
 
 # own modules

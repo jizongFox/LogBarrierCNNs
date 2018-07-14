@@ -1,27 +1,24 @@
 import copy
 import os
 
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
 import medicalDataLoader
-from criterion import CrossEntropyLoss2d
-from enet import Enet
-from utils import pred2segmentation, Colorize
-from visualize import Dashboard
-from  utils import show_image_mask
-from pretrain_network import pretrain
 from ADMM import networks
-import matplotlib.pyplot as plt
+from enet import Enet
+from utils import Colorize
+from visualize import Dashboard
 
-board_image = Dashboard(server='http://turing.livia.etsmtl.ca', env="ADMM_image")
-board_loss = Dashboard(server='http://turing.livia.etsmtl.ca', env="ADMM_loss")
+# board_image = Dashboard(server='http://localhost', env="ADMM_image")
+# board_loss = Dashboard(server='http://localhost', env="ADMM_loss")
 
 use_gpu = True
 # device = "cuda" if torch.cuda.is_available() and use_gpu else "cpu"
-device =torch.device('cuda')
+device = torch.device('cuda')
 
 batch_size = 1
 batch_size_val = 1
@@ -58,7 +55,7 @@ def main():
     assert set(unlabeled_dataset.imgs) & set(
         labeled_dataset.imgs) == set(), \
         "there's intersection between labeled and unlabeled training set."
-    
+
     labeled_dataLoader = DataLoader(labeled_dataset, batch_size=1, num_workers=num_workers, shuffle=True)
     unlabeled_dataLoader = DataLoader(unlabeled_dataset, batch_size=1, num_workers=num_workers, shuffle=True)
     ## Here we terminate the split of labeled and unlabeled data
@@ -83,24 +80,23 @@ def main():
         # Initialize the ADMM dummy variables for one-batch training
         labeled_dataLoader, unlabeled_dataLoader = iter(labeled_dataLoader), iter(unlabeled_dataLoader)
         labeled_img, labeled_mask, labeled_weak_mask = next(labeled_dataLoader)[0:3]
-        labeled_img, labeled_mask, labeled_weak_mask = labeled_img.to(device), labeled_mask.to(device), labeled_weak_mask.to(device)
+        labeled_img, labeled_mask, labeled_weak_mask = labeled_img.to(device), labeled_mask.to(
+            device), labeled_weak_mask.to(device)
         unlabeled_img, unlabeled_mask = next(unlabeled_dataLoader)[0:2]
         unlabeled_img, unlabeled_mask = unlabeled_img.to(device), unlabeled_mask.to(device)
         # skip those with no foreground masks
         if labeled_mask.sum() == 0 or unlabeled_mask.sum() == 0:
             continue
 
-        net = networks(neural_net,lowerbound=10,upperbound=1000)
+        net = networks(neural_net, lowerbound=10, upperbound=1000)
         for i in xrange(1000):
-            net.update((labeled_img,labeled_mask),unlabeled_img)
+            net.update((labeled_img, labeled_mask), unlabeled_img)
             net.show_labeled_pair()
             net.show_ublabel_image()
             net.show_gamma()
             net.show_s()
 
         net.reset()
-
-
 
 
 if __name__ == "__main__":
