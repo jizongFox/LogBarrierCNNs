@@ -114,12 +114,12 @@ class networks(object):
         self.s = s_new
 
     def update_u(self):
-        new_u = self.u + self.uimage_output[:, 1, :, :].cpu().data.numpy() - self.gamma
+        new_u = self.u + F.softmax(self.uimage_output,dim=1)[:, 1, :, :].cpu().data.numpy() - self.gamma
         assert new_u.shape == self.u.shape
         self.u = new_u
 
     def update_v(self):
-        new_v = self.v + self.uimage_output[:, 1, :, :].cpu().data.numpy() - self.s
+        new_v = self.v + F.softmax(self.uimage_output,dim=1)[:, 1, :, :].cpu().data.numpy() - self.s
         assert new_v.shape == self.v.shape
         self.v = new_v
 
@@ -134,6 +134,7 @@ class networks(object):
 
     def show_labeled_pair(self):
         fig = plt.figure(1,figsize=(8,8))
+        fig.suptitle("labeled data", fontsize=16)
 
         ax1 = fig.add_subplot(221)
         ax1.imshow(self.limage[0].cpu().data.numpy().squeeze())
@@ -158,6 +159,8 @@ class networks(object):
 
     def show_ublabel_image(self):
         fig = plt.figure(2,figsize=(8,4))
+        fig.suptitle("Unlabeled data", fontsize=16)
+
 
         ax1 = fig.add_subplot(121)
         ax1.imshow(self.uimage[0].cpu().data.numpy().squeeze())
