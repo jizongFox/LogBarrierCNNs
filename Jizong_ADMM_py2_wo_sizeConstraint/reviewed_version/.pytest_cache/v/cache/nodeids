@@ -1,0 +1,14 @@
+[
+  "test.py::TestEnergyVoxel::test_boundary_difference_division_2D",
+  "test.py::TestEnergyVoxel::test_boundary_difference_exponential_2D",
+  "test.py::TestEnergyVoxel::test_boundary_difference_linear_2D",
+  "test.py::TestEnergyVoxel::test_boundary_difference_power_2D",
+  "test.py::TestEnergyVoxel::test_boundary_maximum_division_2D",
+  "test.py::TestEnergyVoxel::test_boundary_maximum_exponential_2D",
+  "test.py::TestEnergyVoxel::test_boundary_maximum_linear_2D",
+  "test.py::TestEnergyVoxel::test_boundary_maximum_power_2D",
+  "test.py::TestEnergyVoxel::test_negative_image",
+  "test.py::TestEnergyVoxel::test_regional_probability_map",
+  "test.py::TestEnergyVoxel::test_spacing",
+  "test.py::TestEnergyVoxel::test_zero_image"
+]

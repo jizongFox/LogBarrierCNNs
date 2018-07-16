@@ -55,15 +55,17 @@ class networks(object):
         self.v = None
 
     def update_theta(self):
+
+        self.neural_net.zero_grad()
+
         for i in xrange(10):
             CE_loss = self.CEloss_criterion(self.limage_output, self.lmask.squeeze(1))
             unlabled_loss = self.u_r / 2 * (
-                        self.uimage_output - torch.from_numpy(self.gamma).float().cuda() + torch.Tensor(
-                    self.u).float().cuda()).norm(p=2) ** 2 + self.u_s / 2 * (
-                                        self.uimage_output - torch.from_numpy(self.s).float().cuda() + torch.Tensor(
-                                    self.v).float().cuda()).norm(p=2) ** 2
+                    F.softmax(self.uimage_output, dim=1) - torch.from_numpy(self.gamma).float().cuda() + torch.Tensor(
+                self.u).float().cuda()).norm(p=2) ** 2
 
             loss = CE_loss + unlabled_loss
+            # loss = CE_loss
             self.optimiser.zero_grad()
             loss.backward()
             self.optimiser.step()
@@ -72,17 +74,20 @@ class networks(object):
             self.uimage_forward(self.uimage)
 
     def update_gamma(self):
-        unary_term_gamma_1 = np.multiply((0.5 - (self.uimage_output.cpu().data.numpy()[:, 1, :, :] + self.u)),
-                                         self.gamma)
+        unary_term_gamma_1 = np.multiply(
+            (0.5 - (F.softmax(self.uimage_output, dim=1).cpu().data.numpy()[:, 1, :, :] + self.u)),
+            1)
 
         plt.figure(5)
+        plt.clf()
         plt.imshow(unary_term_gamma_1.squeeze())
         plt.title('unary_term')
+        plt.colorbar()
         plt.show(block=False)
         plt.pause(0.001)
         # unary_term_gamma_0 = -unary_term_gamma_1
         unary_term_gamma_0 = np.zeros(unary_term_gamma_1.shape)
-        neighbor_term = 1
+        neighbor_term = 2
         new_gamma = np.zeros(self.gamma.shape)
         g = maxflow.Graph[float](0, 0)
         i = 0
@@ -91,8 +96,8 @@ class networks(object):
         # Add edges with the same capacities.
         g.add_grid_edges(nodeids, neighbor_term)
         # Add the terminal edges.
-        g.add_grid_tedges(nodeids,unary_term_gamma_1[i].astype(np.int32).squeeze(),
-                          unary_term_gamma_0[i].squeeze())
+        g.add_grid_tedges(nodeids, (unary_term_gamma_0[i]).squeeze(),
+                          (unary_term_gamma_1[i]).squeeze())
         g.maxflow()
         # Get the segments.
         sgm = g.get_grid_segments(nodeids) * 1
@@ -102,45 +107,20 @@ class networks(object):
         g.reset()
         self.gamma = new_gamma
 
-    def update_s(self):
-        s_new = np.zeros(self.s.shape)
-
-        a = self.uimage_output.cpu().data.numpy()[:, 1, :, :] + self.v - 0.5
-        for i in range(a.shape[0]):
-            a_ = a[i]
-            A_plus = (a_ >= 0).sum()
-            A_sub = (a_ < 0).sum()
-            if A_plus >= self.upbound:
-                threshold = np.sort(a_.reshape(-1))[self.upbound:][0]
-                s_new[i][np.where(a_ > threshold)] = 1
-            elif A_plus <= self.upbound:
-                threshold = np.sort(a_.reshape(-1))[::-1][self.lowbound]
-                s_new[i][np.where(a_ > threshold)] = 1
-
-        assert self.s.shape == s_new.shape
-        self.s = s_new
-
     def update_u(self):
-        new_u = self.u + F.softmax(self.uimage_output,dim=1)[:, 1, :, :].cpu().data.numpy() - self.gamma
+        new_u = self.u + F.softmax(self.uimage_output, dim=1)[:, 1, :, :].cpu().data.numpy() - self.gamma
         assert new_u.shape == self.u.shape
         self.u = new_u
-
-    def update_v(self):
-        new_v = self.v + F.softmax(self.uimage_output,dim=1)[:, 1, :, :].cpu().data.numpy() - self.s
-        assert new_v.shape == self.v.shape
-        self.v = new_v
 
     def update(self, (limage, lmask), uimage):
         self.limage_forward(limage, lmask)
         self.uimage_forward(uimage)
         self.update_theta()
         self.update_gamma()
-        self.update_s()
         self.update_u()
-        self.update_v()
 
     def show_labeled_pair(self):
-        fig = plt.figure(1,figsize=(8,8))
+        fig = plt.figure(1, figsize=(8, 8))
         fig.suptitle("labeled data", fontsize=16)
 
         ax1 = fig.add_subplot(221)
@@ -155,24 +135,21 @@ class networks(object):
         ax3.imshow(F.softmax(self.limage_output, dim=1)[0][1].cpu().data.numpy())
         ax3.title.set_text('prediction of the probability')
 
-
         ax4 = fig.add_subplot(224)
-        ax4.imshow(np.abs(self.lmask[0].cpu().data.numpy().squeeze()-F.softmax(self.limage_output, dim=1)[0][1].cpu().data.numpy()))
+        ax4.imshow(np.abs(
+            self.lmask[0].cpu().data.numpy().squeeze() - F.softmax(self.limage_output, dim=1)[0][1].cpu().data.numpy()))
         ax4.title.set_text('difference')
-
 
         plt.show(block=False)
         plt.pause(0.01)
 
     def show_ublabel_image(self):
-        fig = plt.figure(2,figsize=(8,4))
+        fig = plt.figure(2, figsize=(8, 4))
         fig.suptitle("Unlabeled data", fontsize=16)
-
 
         ax1 = fig.add_subplot(121)
         ax1.imshow(self.uimage[0].cpu().data.numpy().squeeze())
         ax1.title.set_text('original image')
-
 
         ax2 = fig.add_subplot(122)
         ax2.imshow(F.softmax(self.uimage_output, dim=1)[0][1].cpu().data.numpy())
@@ -183,16 +160,22 @@ class networks(object):
 
     def show_gamma(self):
         plt.figure(3)
+        # plt.gray()
+        plt.clf()
         plt.subplot(1, 1, 1)
         plt.imshow(self.gamma[0])
+        plt.colorbar()
         plt.title('Gamma')
         plt.show(block=False)
         plt.pause(0.01)
 
-    def show_s(self):
+    def show_u(self):
         plt.figure(4)
+        plt.clf()
+        plt.title('Multipicator')
         plt.subplot(1, 1, 1)
-        plt.imshow(self.s[0])
+        plt.imshow(self.u.squeeze())
+        plt.colorbar()
         plt.show(block=False)
         plt.pause(0.01)
 
