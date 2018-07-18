@@ -10,7 +10,7 @@ def pretrain(dataloader, network, path=None):
     class config:
         lr = 1e-3
         epochs = 100
-        path ='checkpoint/pretrained_net.pth'
+        path ='checkpoint/pretrained_net_good.pth'
 
 
     pretrain_config = config()

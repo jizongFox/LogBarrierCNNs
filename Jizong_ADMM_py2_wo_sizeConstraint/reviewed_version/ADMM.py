@@ -18,11 +18,12 @@ class networks(object):
         self.upbound = upperbound
         self.neural_net = neural_network
         self.reset()
-        self.optimiser = torch.optim.SGD(self.neural_net.parameters(), lr=0.0005, weight_decay=1e-5)
+        self.optimiser = torch.optim.Adam(self.neural_net.parameters(), lr=0.0001)
         self.CEloss_criterion = CrossEntropyLoss2d()
         self.u_r = 1.0
-        self.lamda = 0.2
-        self.set_bound=False
+        self.lamda =1
+        # self.set_bound=False
+        self.sigma = 0.05
 
 
     def limage_forward(self, limage, lmask):
@@ -62,7 +63,7 @@ class networks(object):
 
         self.neural_net.zero_grad()
 
-        for i in xrange(1):
+        for i in xrange(3):
             # CE_loss = self.CEloss_criterion(self.limage_output, self.lmask.squeeze(1))
             unlabled_loss = self.u_r / 2 * (
                     F.softmax(self.uimage_output, dim=1)[:,1] - torch.from_numpy(self.gamma).float().cuda() + torch.Tensor(
@@ -99,7 +100,7 @@ class networks(object):
         structure = np.zeros((3, 3))
         structure[2, 1] = 1
         g.add_grid_edges(nodeids, structure=structure, weights=weights, symmetric=True)
-        self.set_bound=True
+        # self.set_bound=True
         return g
 
     def update_gamma(self):
@@ -107,7 +108,7 @@ class networks(object):
         unary_term_gamma_1 = np.multiply(
             (0.5 - (F.softmax(self.uimage_output, dim=1).cpu().data.numpy()[:, 1, :, :] + self.u)),
             1)
-
+        #
         # plt.figure(5,figsize=(4.5,4.5))
         # plt.clf()
         # plt.imshow(unary_term_gamma_1.squeeze())
@@ -117,15 +118,15 @@ class networks(object):
         # plt.pause(0.001)
         # unary_term_gamma_0 = -unary_term_gamma_1
         unary_term_gamma_0 = np.zeros(unary_term_gamma_1.shape)
-        neighbor_term = self.lamda
         new_gamma = np.zeros(self.gamma.shape)
         g = maxflow.Graph[float](0, 0)
         i = 0
         # Add the nodes.
         nodeids = g.add_grid_nodes(list(self.gamma.shape)[1:])
         # Add edges with the same capacities.
+        neighbor_term = self.lamda
         # g.add_grid_edges(nodeids, neighbor_term)
-        g = self.set_boundary_term(g,nodeids,self.uimage,lumda=self.lamda,k=1/2000.0) if not self.set_bound else g
+        g = self.set_boundary_term(g,nodeids,self.uimage,lumda=self.lamda,k=self.sigma)
 
 
         # Add the terminal edges.
@@ -137,7 +138,7 @@ class networks(object):
 
         # The labels should be 1 where sgm is False and 0 otherwise.
         new_gamma[i] = np.int_(np.logical_not(sgm))
-        g.reset()
+        # g.reset()
         self.gamma = new_gamma
 
     def update_u(self):
@@ -153,11 +154,11 @@ class networks(object):
         self.uimage_forward(uimage,umask)
         self.update_theta()
         self.update_gamma()
-
         self.update_u()
 
     def show_labeled_pair(self):
-        fig = plt.figure(1, figsize=(8, 8))
+        fig = plt.figure(1, figsize=(32, 32))
+        plt.clf()
         fig.suptitle("labeled data", fontsize=16)
 
         ax1 = fig.add_subplot(221)
@@ -177,6 +178,7 @@ class networks(object):
             self.lmask[0].cpu().data.numpy().squeeze() - F.softmax(self.limage_output, dim=1)[0][1].cpu().data.numpy()))
         ax4.title.set_text('difference')
 
+        plt.tight_layout()
         plt.show(block=False)
         plt.pause(0.01)
 
@@ -185,24 +187,37 @@ class networks(object):
         fig.suptitle("Unlabeled data", fontsize=16)
 
         ax1 = fig.add_subplot(221)
-        ax1.imshow(self.uimage[0].cpu().data.numpy().squeeze())
+        ax1.imshow(self.uimage[0].cpu().data.numpy().squeeze(),cmap='gray')
         ax1.title.set_text('original image')
+        ax1.set_axis_off()
 
         ax2 = fig.add_subplot(222)
-        ax2.imshow(F.softmax(self.uimage_output, dim=1)[0][1].cpu().data.numpy())
+        # ax1.imshow(self.uimage[0].cpu().data.numpy().squeeze(),cmap='gray')
+        ax2.imshow(F.softmax(self.uimage_output, dim=1)[0][1].cpu().data.numpy(),cmap='gray')
         # ax2.contour(F.softmax(self.uimage_output, dim=1)[0][1].cpu().data.numpy(),level=(0.5,0.5),colors="red",alpha=0.5)
         ax2.title.set_text('probability prediction')
+        ax2.set_axis_off()
 
         ax3 = fig.add_subplot(223)
-        ax3.imshow(self.umask.squeeze().cpu().data.numpy())
-        # ax2.contour(F.softmax(self.uimage_output, dim=1)[0][1].cpu().data.numpy(),level=(0.5,0.5),colors="red",alpha=0.5)
+        ax3.clear()
+        ax3.imshow(self.uimage[0].cpu().data.numpy().squeeze(), cmap='gray')
+        # ax3.imshow(self.umask.squeeze().cpu().data.numpy(),cmap='gray')
+        ax3.contour(self.umask.squeeze().cpu().data.numpy(),level=[0],colors="red",alpha=1,linewidth=0.001)
         ax3.title.set_text('ground truth mask')
+        ax3.set_axis_off()
 
 
         ax4 = fig.add_subplot(224)
-        ax4.imshow(self.heatmap2segmentation(self.uimage_output).squeeze().cpu().data.numpy())
+        ax4.clear()
+        ax4.imshow(self.uimage[0].cpu().data.numpy().squeeze(), cmap='gray')
+        # ax4.imshow(self.heatmap2segmentation(self.uimage_output).squeeze().cpu().data.numpy(),cmap='gray')
+        ax4.contour(self.heatmap2segmentation(self.uimage_output).squeeze().cpu().data.numpy(),level=[0],colors="red",alpha=1,linewidth=0.001)
         # ax2.contour(F.softmax(self.uimage_output, dim=1)[0][1].cpu().data.numpy(),level=(0.5,0.5),colors="red",alpha=0.5)
         ax4.title.set_text('prediction mask')
+        ax4.set_axis_off()
+        # plt.tight_layout()
+        # figManager = plt.get_current_fig_manager()
+        # figManager.window.showMaximized()
 
         plt.show(block=False)
         plt.pause(0.01)
@@ -212,9 +227,14 @@ class networks(object):
         # plt.gray()
         plt.clf()
         plt.subplot(1, 1, 1)
-        plt.imshow(self.gamma[0])
-        plt.colorbar()
+        plt.imshow(self.uimage[0].cpu().data.numpy().squeeze(), cmap='gray')
+        # plt.imshow(self.gamma[0])
+        plt.contour(self.umask.squeeze().cpu().data.numpy(),level=[0],colors="black",alpha=1,linewidth=0.001)
+        plt.contour(self.heatmap2segmentation(self.uimage_output).squeeze().cpu().data.numpy(),level=[0],colors="green",alpha=0.5,linewidth=0.001)
+        plt.contour(self.gamma[0],level=[0],colors="red",alpha=0.3,linewidth=0.001)
         plt.title('Gamma')
+        figManager = plt.get_current_fig_manager()
+        figManager.window.showMaximized()
         plt.show(block=False)
         plt.pause(0.01)
 

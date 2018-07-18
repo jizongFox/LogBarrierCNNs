@@ -74,7 +74,7 @@ def main():
     ## Uncomment the following line to pretrain the model with few fully labeled data.
     # pretrain(labeled_dataLoader,net,)
     map_location = lambda storage, loc: storage
-    net.load_state_dict(torch.load('checkpoint/pretrained_net.pth', map_location=map_location))
+    net.load_state_dict(torch.load('checkpoint/pretrained_net_good.pth', map_location=map_location))
     net.to(device)
     # optimiser = torch.optim.Adam(net.parameters(),lr = lr, weight_decay=1e-5)
 
