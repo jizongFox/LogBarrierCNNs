@@ -18,17 +18,20 @@ class networks(object):
         self.upbound = upperbound
         self.neural_net = neural_network
         self.reset()
-        self.optimiser = torch.optim.Adam(self.neural_net.parameters(), lr=0.001, weight_decay=1e-5)
+        self.optimiser = torch.optim.SGD(self.neural_net.parameters(), lr=0.0005, weight_decay=1e-5)
         self.CEloss_criterion = CrossEntropyLoss2d()
-        self.u_r = 1
-        self.u_s = 1
+        self.u_r = 1.0
+        self.lamda = 0.2
+        self.set_bound=False
+
 
     def limage_forward(self, limage, lmask):
         self.limage = limage
         self.lmask = lmask
         self.limage_output = self.neural_net(limage)
 
-    def uimage_forward(self, uimage):
+    def uimage_forward(self, uimage,umask):
+        self.umask = umask
         self.uimage = uimage
         self.uimage_output = self.neural_net(uimage)
         if self.gamma is None:
@@ -47,54 +50,84 @@ class networks(object):
         self.limage = None
         self.uimage = None
         self.lmask = None
+        self.umask = None
         self.limage_output = None
         self.uimage_output = None
         self.gamma = None
-        self.s = None
         self.u = None
-        self.v = None
+        self.set_bound=False
+        plt.close('all')
 
     def update_theta(self):
 
         self.neural_net.zero_grad()
 
-        for i in xrange(10):
-            CE_loss = self.CEloss_criterion(self.limage_output, self.lmask.squeeze(1))
+        for i in xrange(1):
+            # CE_loss = self.CEloss_criterion(self.limage_output, self.lmask.squeeze(1))
             unlabled_loss = self.u_r / 2 * (
-                    F.softmax(self.uimage_output, dim=1) - torch.from_numpy(self.gamma).float().cuda() + torch.Tensor(
+                    F.softmax(self.uimage_output, dim=1)[:,1] - torch.from_numpy(self.gamma).float().cuda() + torch.Tensor(
                 self.u).float().cuda()).norm(p=2) ** 2
 
-            loss = CE_loss + unlabled_loss
-            # loss = CE_loss
+
+            # loss = CE_loss + unlabled_loss
+            loss = unlabled_loss
             self.optimiser.zero_grad()
             loss.backward()
             self.optimiser.step()
+            print('loss:',loss.item())
 
-            self.limage_forward(self.limage, self.lmask)  # shape b,c,w,h
-            self.uimage_forward(self.uimage)
+            # self.limage_forward(self.limage, self.lmask)  # shape b,c,w,h
+            self.uimage_forward(self.uimage,self.umask)
+        # print(F.softmax(self.uimage_output,dim=1).max().item())
+
+    def set_boundary_term(self,g,nodeids,img,lumda,k):
+        img = img.squeeze().cpu().data.numpy()
+        pad_im = np.pad(img, ((0, 0), (1, 1)), 'constant', constant_values=0)
+        weights = np.zeros((img.shape))
+        for i in range(img.shape[0]):
+            for j in range(img.shape[1]):
+                weights[i, j] = lumda * np.exp((-1/k) * np.abs(pad_im[i, j] - pad_im[i, j + 1]))
+        structure = np.zeros((3, 3))
+        structure[1, 2] = 1
+        g.add_grid_edges(nodeids, structure=structure, weights=weights, symmetric=True)
+
+        pad_im = np.pad(img, ((1, 1), (0, 0)), 'constant', constant_values=0)
+        weights = np.zeros((img.shape))
+        for i in range(img.shape[0]):
+            for j in range(img.shape[1]):
+                weights[i, j] = lumda * np.exp((-1/k) * np.abs(pad_im[i, j] - pad_im[i + 1, j]))
+        structure = np.zeros((3, 3))
+        structure[2, 1] = 1
+        g.add_grid_edges(nodeids, structure=structure, weights=weights, symmetric=True)
+        self.set_bound=True
+        return g
 
     def update_gamma(self):
+
         unary_term_gamma_1 = np.multiply(
             (0.5 - (F.softmax(self.uimage_output, dim=1).cpu().data.numpy()[:, 1, :, :] + self.u)),
             1)
 
-        plt.figure(5)
-        plt.clf()
-        plt.imshow(unary_term_gamma_1.squeeze())
-        plt.title('unary_term')
-        plt.colorbar()
-        plt.show(block=False)
-        plt.pause(0.001)
+        # plt.figure(5,figsize=(4.5,4.5))
+        # plt.clf()
+        # plt.imshow(unary_term_gamma_1.squeeze())
+        # plt.title('unary_term')
+        # plt.colorbar()
+        # plt.show(block=False)
+        # plt.pause(0.001)
         # unary_term_gamma_0 = -unary_term_gamma_1
         unary_term_gamma_0 = np.zeros(unary_term_gamma_1.shape)
-        neighbor_term = 2
+        neighbor_term = self.lamda
         new_gamma = np.zeros(self.gamma.shape)
         g = maxflow.Graph[float](0, 0)
         i = 0
         # Add the nodes.
         nodeids = g.add_grid_nodes(list(self.gamma.shape)[1:])
         # Add edges with the same capacities.
-        g.add_grid_edges(nodeids, neighbor_term)
+        # g.add_grid_edges(nodeids, neighbor_term)
+        g = self.set_boundary_term(g,nodeids,self.uimage,lumda=self.lamda,k=1/2000.0) if not self.set_bound else g
+
+
         # Add the terminal edges.
         g.add_grid_tedges(nodeids, (unary_term_gamma_0[i]).squeeze(),
                           (unary_term_gamma_1[i]).squeeze())
@@ -108,15 +141,19 @@ class networks(object):
         self.gamma = new_gamma
 
     def update_u(self):
-        new_u = self.u + F.softmax(self.uimage_output, dim=1)[:, 1, :, :].cpu().data.numpy() - self.gamma
+        # new_u = self.u + F.softmax(self.uimage_output, dim=1)[:, 1, :, :].cpu().data.numpy() - self.gamma
+        new_u = self.u + (self.heatmap2segmentation(self.uimage_output).cpu().data.numpy() - self.gamma)
+        print(np.array((self.heatmap2segmentation(self.uimage_output).cpu().data.numpy() - self.gamma).nonzero()).sum())
         assert new_u.shape == self.u.shape
+
         self.u = new_u
 
-    def update(self, (limage, lmask), uimage):
+    def update(self, (limage, lmask), (uimage,umask)):
         self.limage_forward(limage, lmask)
-        self.uimage_forward(uimage)
+        self.uimage_forward(uimage,umask)
         self.update_theta()
         self.update_gamma()
+
         self.update_u()
 
     def show_labeled_pair(self):
@@ -144,22 +181,34 @@ class networks(object):
         plt.pause(0.01)
 
     def show_ublabel_image(self):
-        fig = plt.figure(2, figsize=(8, 4))
+        fig = plt.figure(2, figsize=(8, 8))
         fig.suptitle("Unlabeled data", fontsize=16)
 
-        ax1 = fig.add_subplot(121)
+        ax1 = fig.add_subplot(221)
         ax1.imshow(self.uimage[0].cpu().data.numpy().squeeze())
         ax1.title.set_text('original image')
 
-        ax2 = fig.add_subplot(122)
+        ax2 = fig.add_subplot(222)
         ax2.imshow(F.softmax(self.uimage_output, dim=1)[0][1].cpu().data.numpy())
+        # ax2.contour(F.softmax(self.uimage_output, dim=1)[0][1].cpu().data.numpy(),level=(0.5,0.5),colors="red",alpha=0.5)
         ax2.title.set_text('probability prediction')
+
+        ax3 = fig.add_subplot(223)
+        ax3.imshow(self.umask.squeeze().cpu().data.numpy())
+        # ax2.contour(F.softmax(self.uimage_output, dim=1)[0][1].cpu().data.numpy(),level=(0.5,0.5),colors="red",alpha=0.5)
+        ax3.title.set_text('ground truth mask')
+
+
+        ax4 = fig.add_subplot(224)
+        ax4.imshow(self.heatmap2segmentation(self.uimage_output).squeeze().cpu().data.numpy())
+        # ax2.contour(F.softmax(self.uimage_output, dim=1)[0][1].cpu().data.numpy(),level=(0.5,0.5),colors="red",alpha=0.5)
+        ax4.title.set_text('prediction mask')
 
         plt.show(block=False)
         plt.pause(0.01)
 
     def show_gamma(self):
-        plt.figure(3)
+        plt.figure(3,figsize=(5,5))
         # plt.gray()
         plt.clf()
         plt.subplot(1, 1, 1)
@@ -170,7 +219,7 @@ class networks(object):
         plt.pause(0.01)
 
     def show_u(self):
-        plt.figure(4)
+        plt.figure(4,figsize=(5,5))
         plt.clf()
         plt.title('Multipicator')
         plt.subplot(1, 1, 1)
@@ -184,7 +233,6 @@ if __name__ == "__main__":
     net = UNet(num_classes=2)
     net_ = networks(net, 10, 100)
     for i in xrange(10):
-        # print(net_)
         limage = torch.randn(1, 1, 256, 256)
         uimage = torch.randn(1, 1, 256, 256)
         lmask = torch.randint(0, 2, (1, 256, 256), dtype=torch.long)

@@ -6,14 +6,15 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
-
+from pretrain_network import pretrain
 import medicalDataLoader
 from ADMM import networks
 from enet import Enet
 from utils import Colorize
 from visualize import Dashboard
-# torch.manual_seed(1)
-# np.random.seed(2)
+
+torch.manual_seed(3)
+np.random.seed(2)
 
 # board_image = Dashboard(server='http://localhost', env="ADMM_image")
 # board_loss = Dashboard(server='http://localhost', env="ADMM_loss")
@@ -73,11 +74,12 @@ def main():
     neural_net = Enet(2)
     ## Uncomment the following line to pretrain the model with few fully labeled data.
     # pretrain(labeled_dataLoader,neural_net,)
+
     map_location = lambda storage, loc: storage
     neural_net.load_state_dict(torch.load('../checkpoint/pretrained_net.pth', map_location=map_location))
     neural_net.to(device)
     plt.ion()
-    for iteration in xrange(3):
+    for iteration in xrange(300):
         ## choose randomly a batch of image from labeled dataset and unlabeled dataset.
         # Initialize the ADMM dummy variables for one-batch training
         labeled_dataLoader, unlabeled_dataLoader = iter(labeled_dataLoader), iter(unlabeled_dataLoader)
@@ -91,12 +93,12 @@ def main():
             continue
 
         net = networks(neural_net, lowerbound=10, upperbound=1000)
-        for i in xrange(1000):
-            net.update((labeled_img, labeled_mask), unlabeled_img)
-            net.show_labeled_pair()
+        for i in xrange(3):
+            net.update((labeled_img, labeled_mask), (unlabeled_img, unlabeled_mask))
+            # net.show_labeled_pair()
             net.show_ublabel_image()
-            net.show_gamma()
-            net.show_u()
+            # net.show_gamma()
+            # net.show_u()
 
         net.reset()
 
