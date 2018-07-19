@@ -1,171 +1,193 @@
-"""
-Unittest for the medpy.graphcut.energy_voxel methods.
-@author Oskar Maier
-@version r0.1.0
-@since 2016-02-20
-@status Release
-"""
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
-# build-in modules
-import unittest
 
-# third-party modules
-import numpy
-from numpy.testing import assert_array_equal
+u = torch.zeros((1),requires_grad=False).float()
+f = torch.tensor([0.7],requires_grad=True).float()
 
-# own modules
-from medpy.graphcut import graph_from_voxels
-from medpy.graphcut.energy_voxel import boundary_difference_linear, boundary_difference_exponential, \
-    boundary_difference_division, boundary_difference_power, \
-    boundary_maximum_linear, boundary_maximum_exponential, \
-    boundary_maximum_division, boundary_maximum_power, \
-    regional_probability_map
+gamma = torch.zeros((1),requires_grad=False)
+gamma[0]=1
 
-class TestEnergyVoxel(unittest.TestCase):
-    BOUNDARY_TERMS = [boundary_difference_linear, boundary_difference_exponential, \
-                      boundary_difference_division, boundary_difference_power, \
-                      boundary_maximum_linear, boundary_maximum_exponential, \
-                      boundary_maximum_division, boundary_maximum_power]
-    BOUNDARY_TERMS_2ARGS = [boundary_difference_linear, boundary_maximum_linear]
-    BOUNDARY_TERMS_3ARGS = [boundary_difference_exponential, \
-                            boundary_difference_division, boundary_difference_power, \
-                            boundary_maximum_exponential, \
-                            boundary_maximum_division, boundary_maximum_power]
+# loss = lambda (f,u,gamma): (F.sigmoid(f)-gamma+u)**2
+learning_rate= 0.1
+U =[]
+F_=[]
+sigmod_F=[]
+loss = []
+p=10
 
-    image = numpy.asarray([[0, 0, 0, 0],
-                           [0, 0, 0, 0],
-                           [0, 0, 1, 1],
-                           [0, 0, 1, 1]], dtype=numpy.float)
-    fgmarkers = numpy.asarray([[0, 0, 0, 0],
-                               [0, 0, 0, 0],
-                               [0, 0, 0, 0],
-                               [0, 0, 0, 1]])
-    bgmarkers = numpy.asarray([[1, 0, 0, 0],
-                               [0, 0, 0, 0],
-                               [0, 0, 0, 0],
-                               [0, 0, 0, 0]])
-    result = numpy.asarray([[0, 0, 0, 0],
-                            [0, 0, 0, 0],
-                            [0, 0, 1, 1],
-                            [0, 0, 1, 1]], dtype=numpy.bool)
+for i in range (10000):
 
-    gradient = numpy.asarray([[0, 0, 0, 0],
-                              [0, 1, 1, 1],
-                              [0, 1, 0, 0],
-                              [0, 1, 0, 0]], dtype=numpy.float)
+    l =  u*(F.sigmoid(f)-gamma)+ p/2.0*(F.sigmoid(f)-gamma)**2
+    l.backward()
 
-    # Base functionality tests
-    def test_boundary_difference_linear_2D(self):
-        self.__test_boundary_term_2d(boundary_difference_linear, (self.image, False))
+    with torch.no_grad():
+        f -= learning_rate * f.grad
+        f.grad.zero_()
+        gamma = ((f>0.5)*1).float()
+        u = u + p*(F.sigmoid(f)-gamma)
 
-    def test_boundary_difference_exponential_2D(self):
-        self.__test_boundary_term_2d(boundary_difference_exponential, (self.image, 1., False))
 
-    def test_boundary_difference_division_2D(self):
-        self.__test_boundary_term_2d(boundary_difference_division, (self.image, .5, False))
+    U.append(u.item())
+    F_.append(f.item())
+    sigmod_F.append(F.sigmoid(f).item())
 
-    def test_boundary_difference_power_2D(self):
-        self.__test_boundary_term_2d(boundary_difference_power, (self.image, 2., False))
+    print(f.item(),F.sigmoid(f).item())
 
-    def test_boundary_maximum_linear_2D(self):
-        self.__test_boundary_term_2d(boundary_maximum_linear, (self.gradient, False))
 
-    def test_boundary_maximum_exponential_2D(self):
-        self.__test_boundary_term_2d(boundary_maximum_exponential, (self.gradient, 1., False))
+import matplotlib.pyplot as plt
 
-    def test_boundary_maximum_division_2D(self):
-        self.__test_boundary_term_2d(boundary_maximum_division, (self.gradient, .5, False))
+plt.plot(U,label='U')
+plt.plot(F_,label="F")
+plt.plot(sigmod_F,label="sigmoid F")
+# plt.plot([x+y for (x,y) in zip(sigmod_F,U)])
+plt.legend()
+plt.show()
 
-    def test_boundary_maximum_power_2D(self):
-        self.__test_boundary_term_2d(boundary_maximum_power, (self.gradient, 2., False))
+#
+#
+#
+# u=0
+# f= -1
+# gamma = 1
+# sigmoid = lambda x: 1 / (1 + np.exp(-x))
+#
+# loss = lambda (f,u,gamma) : f+ (sigmoid(f)-gamma+u)**2
+#
+# learning_rate=1
+#
+# def gradient(f,u,gamma):
+#     # delta = 0.0000000001
+#     # return (loss((f+delta,u,gamma))-loss((f,u,gamma)))/delta
+#     if f > gamma:
+#         return 0.01
+#     else: return -0.01
+#
+# U=[]
+# F=[]
+# for i in range (10000):
+#     f = f - gradient(f,u,gamma) * learning_rate
+#     # gamma = (f > 0.5) * 1
+#     u = u + f-1
+#     U.append(u)
+#     F.append(f)
+#     print(f,sigmoid(f),u,gamma)
+#
+# import matplotlib.pyplot as plt
+# plt.plot(U,label='U')
+# plt.plot(F,label="F")
+# plt.legend()
+# plt.show()
 
-    def test_regional_probability_map(self):
-        probability = self.image / 2.
-        self.__test_regional_term_2d(regional_probability_map, (probability, 1.0))
 
-    # Spacing tests
-    def test_spacing(self):
-        image = numpy.asarray([[0, 0, 0, 0, 0],
-                               [0, 0, 2, 0, 0],
-                               [0, 0, 2, 0, 0],
-                               [0, 0, 2, 0, 0],
-                               [0, 0, 2, 0, 0]], dtype=numpy.float)
-        fgmarkers = numpy.asarray([[0, 0, 0, 0, 0],
-                                   [0, 0, 0, 0, 0],
-                                   [0, 0, 0, 0, 0],
-                                   [0, 0, 0, 0, 0],
-                                   [0, 0, 1, 0, 0]], dtype=numpy.bool)
-        bgmarkers = numpy.asarray([[1, 0, 0, 0, 1],
-                                   [0, 0, 0, 0, 0],
-                                   [0, 0, 0, 0, 0],
-                                   [0, 0, 0, 0, 0],
-                                   [0, 0, 0, 0, 0]], dtype=numpy.bool)
-        expected = image.astype(numpy.bool)
-        graph = graph_from_voxels(fgmarkers,
-                                  bgmarkers,
-                                  boundary_term=boundary_difference_division,
-                                  boundary_term_args=(image, 1.0, (1., 5.0)))
-        result = self.__execute(graph, image)
-        assert_array_equal(result, expected)
+'''
+import torch
 
-    # Special case tests
-    def test_negative_image(self):
-        image = numpy.asarray([[-1, 1, -4], [2, -7, 3], [-2.3, 3, -7]], dtype=numpy.float)
-        self.__test_all_on_image(image)
+dtype = torch.float
+# device = torch.device("cpu")
+# device = torch.device("cuda:0") # Uncomment this to run on GPU
 
-    def test_zero_image(self):
-        image = numpy.asarray([[0, 0, 0], [0, 0, 0], [0, 0, 0]], dtype=numpy.float)
-        self.__test_all_on_image(image)
+# N is batch size; D_in is input dimension;
+# H is hidden dimension; D_out is output dimension.
+N, D_in, H, D_out = 64, 1000, 100, 10
 
-    # Helper functions
-    def __test_all_on_image(self, image):
-        for bt in self.BOUNDARY_TERMS_2ARGS:
-            graph = graph_from_voxels(self.fgmarkers,
-                                      self.bgmarkers,
-                                      boundary_term=bt,
-                                      boundary_term_args=(image, False))
-            self.__execute(graph, self.image)
+# Create random Tensors to hold input and outputs.
+# Setting requires_grad=False indicates that we do not need to compute gradients
+# with respect to these Tensors during the backward pass.
+x = torch.randn(N, D_in)
+y = torch.randn(N, D_out)
 
-        for bt in self.BOUNDARY_TERMS_3ARGS:
-            graph = graph_from_voxels(self.fgmarkers,
-                                      self.bgmarkers,
-                                      boundary_term=bt,
-                                      boundary_term_args=(image, 1.0, False))
-            self.__execute(graph, self.image)
+# Create random Tensors for weights.
+# Setting requires_grad=True indicates that we want to compute gradients with
+# respect to these Tensors during the backward pass.
+w1 = torch.randn(D_in, H,  dtype=dtype, requires_grad=True)
+w2 = torch.randn(H, D_out,  dtype=dtype, requires_grad=True)
 
-    def __test_boundary_term_2d(self, term, term_args):
-        graph = graph_from_voxels(self.fgmarkers,
-                                  self.bgmarkers,
-                                  boundary_term=term,
-                                  boundary_term_args=term_args)
-        result = self.__execute(graph, self.image)
-        assert_array_equal(result, self.result)
+learning_rate = 1e-6
+for t in range(500):
+    # Forward pass: compute predicted y using operations on Tensors; these
+    # are exactly the same operations we used to compute the forward pass using
+    # Tensors, but we do not need to keep references to intermediate values since
+    # we are not implementing the backward pass by hand.
+    y_pred = x.mm(w1).clamp(min=0).mm(w2)
 
-    def __test_regional_term_2d(self, term, term_args):
-        graph = graph_from_voxels(self.fgmarkers,
-                                  self.bgmarkers,
-                                  regional_term=term,
-                                  regional_term_args=term_args)
-        result = self.__execute(graph, self.image)
-        assert_array_equal(result, self.result)
+    # Compute and print loss using operations on Tensors.
+    # Now loss is a Tensor of shape (1,)
+    # loss.item() gets the a scalar value held in the loss.
+    loss = (y_pred - y).pow(2).sum()
+    print(t, loss.item())
 
-    def __execute(self, graph, image):
-        """Executes a graph cut and returns the processed results."""
-        # execute min-cut / executing BK_MFMC
-        try:
-            graph.maxflow()
-        except Exception as e:
-            self.fail('An error was thrown during the external executions: {}'.format(e.message))
+    # Use autograd to compute the backward pass. This call will compute the
+    # gradient of loss with respect to all Tensors with requires_grad=True.
+    # After this call w1.grad and w2.grad will be Tensors holding the gradient
+    # of the loss with respect to w1 and w2 respectively.
+    loss.backward()
 
-        # reshape results to form a valid mask
-        result = numpy.zeros(image.size, dtype=numpy.bool)
-        for idx in range(len(result)):
-            result[idx] = 0 if graph.termtype.SINK == graph.what_segment(idx) else 1
-        return result.reshape(image.shape)
+    # Manually update weights using gradient descent. Wrap in torch.no_grad()
+    # because weights have requires_grad=True, but we don't need to track this
+    # in autograd.
+    # An alternative way is to operate on weight.data and weight.grad.data.
+    # Recall that tensor.data gives a tensor that shares the storage with
+    # tensor, but doesn't track history.
+    # You can also use torch.optim.SGD to achieve this.
+    with torch.no_grad():
+        w1 -= learning_rate * w1.grad
+        w2 -= learning_rate * w2.grad
 
-    def __print_nweights(self, graph):
-        n = graph.get_node_num()
-        for i in range(n):
-            for j in range(i, n):
-                if not i == j:
-                    print(i, j, graph.get_edge(i, j))
+        # Manually zero the gradients after updating weights
+        w1.grad.zero_()
+        w2.grad.zero_()
+
+# N is batch size; D_in is input dimension;
+# H is hidden dimension; D_out is output dimension.
+N, D_in, H, D_out = 64, 1000, 100, 10
+
+# Create random Tensors to hold input and outputs.
+# Setting requires_grad=False indicates that we do not need to compute gradients
+# with respect to these Tensors during the backward pass.
+x = torch.randn(N, D_in,  dtype=dtype)
+y = torch.randn(N, D_out, dtype=dtype)
+
+# Create random Tensors for weights.
+# Setting requires_grad=True indicates that we want to compute gradients with
+# respect to these Tensors during the backward pass.
+w1 = torch.randn(D_in, H,  dtype=dtype, requires_grad=True)
+w2 = torch.randn(H, D_out, dtype=dtype, requires_grad=True)
+
+learning_rate = 1e-6
+for t in range(500):
+    # Forward pass: compute predicted y using operations on Tensors; these
+    # are exactly the same operations we used to compute the forward pass using
+    # Tensors, but we do not need to keep references to intermediate values since
+    # we are not implementing the backward pass by hand.
+    y_pred = x.mm(w1).clamp(min=0).mm(w2)
+
+    # Compute and print loss using operations on Tensors.
+    # Now loss is a Tensor of shape (1,)
+    # loss.item() gets the a scalar value held in the loss.
+    loss = (y_pred - y).pow(2).sum()
+    print(t, loss.item())
+
+    # Use autograd to compute the backward pass. This call will compute the
+    # gradient of loss with respect to all Tensors with requires_grad=True.
+    # After this call w1.grad and w2.grad will be Tensors holding the gradient
+    # of the loss with respect to w1 and w2 respectively.
+    loss.backward()
+
+    # Manually update weights using gradient descent. Wrap in torch.no_grad()
+    # because weights have requires_grad=True, but we don't need to track this
+    # in autograd.
+    # An alternative way is to operate on weight.data and weight.grad.data.
+    # Recall that tensor.data gives a tensor that shares the storage with
+    # tensor, but doesn't track history.
+    # You can also use torch.optim.SGD to achieve this.
+    with torch.no_grad():
+        w1 -= learning_rate * w1.grad
+        w2 -= learning_rate * w2.grad
+
+        # Manually zero the gradients after updating weights
+        w1.grad.zero_()
+        w2.grad.zero_()
+'''

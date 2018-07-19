@@ -14,7 +14,7 @@ from enet import Enet
 from utils import Colorize
 from visualize import Dashboard
 
-torch.manual_seed(5)
+torch.manual_seed(7)
 np.random.seed(2)
 
 # board_image = Dashboard(server='http://localhost', env="ADMM_image")
@@ -94,12 +94,12 @@ def main():
             continue
 
         net = networks(neural_net, lowerbound=10, upperbound=1000)
-        for i in xrange(30):
+        for i in xrange(300):
             net.update((labeled_img, labeled_mask), (unlabeled_img, unlabeled_mask))
             # net.show_labeled_pair()
-            # net.show_ublabel_image()
+            net.show_ublabel_image()
             net.show_gamma()
-            # net.show_u()
+            net.show_u()
 
         net.reset()
 

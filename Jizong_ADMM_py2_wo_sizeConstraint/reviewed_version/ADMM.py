@@ -20,11 +20,11 @@ class networks(object):
         self.reset()
         self.optimiser = torch.optim.Adam(self.neural_net.parameters(), lr=0.0001)
         self.CEloss_criterion = CrossEntropyLoss2d()
-        self.u_r = 1.0
-        self.lamda =1
+        self.u_r = 1000
+        self.lamda = 0
         # self.set_bound=False
         self.sigma = 0.05
-
+        self.scale =0.5
 
     def limage_forward(self, limage, lmask):
         self.limage = limage
@@ -81,13 +81,13 @@ class networks(object):
             self.uimage_forward(self.uimage,self.umask)
         # print(F.softmax(self.uimage_output,dim=1).max().item())
 
-    def set_boundary_term(self,g,nodeids,img,lumda,k):
+    def set_boundary_term(self,g,nodeids,img,lumda,sigma):
         img = img.squeeze().cpu().data.numpy()
         pad_im = np.pad(img, ((0, 0), (1, 1)), 'constant', constant_values=0)
         weights = np.zeros((img.shape))
         for i in range(img.shape[0]):
             for j in range(img.shape[1]):
-                weights[i, j] = lumda * np.exp((-1/k) * np.abs(pad_im[i, j] - pad_im[i, j + 1]))
+                weights[i, j] = lumda * np.exp((-1/sigma) * np.abs(pad_im[i, j] - pad_im[i, j + 1]))
         structure = np.zeros((3, 3))
         structure[1, 2] = 1
         g.add_grid_edges(nodeids, structure=structure, weights=weights, symmetric=True)
@@ -96,7 +96,7 @@ class networks(object):
         weights = np.zeros((img.shape))
         for i in range(img.shape[0]):
             for j in range(img.shape[1]):
-                weights[i, j] = lumda * np.exp((-1/k) * np.abs(pad_im[i, j] - pad_im[i + 1, j]))
+                weights[i, j] = lumda * np.exp((-1/sigma) * np.abs(pad_im[i, j] - pad_im[i + 1, j]))
         structure = np.zeros((3, 3))
         structure[2, 1] = 1
         g.add_grid_edges(nodeids, structure=structure, weights=weights, symmetric=True)
@@ -124,9 +124,9 @@ class networks(object):
         # Add the nodes.
         nodeids = g.add_grid_nodes(list(self.gamma.shape)[1:])
         # Add edges with the same capacities.
-        neighbor_term = self.lamda
+
         # g.add_grid_edges(nodeids, neighbor_term)
-        g = self.set_boundary_term(g,nodeids,self.uimage,lumda=self.lamda,k=self.sigma)
+        g = self.set_boundary_term(g,nodeids,self.uimage,lumda=self.lamda,sigma=self.sigma)
 
 
         # Add the terminal edges.
@@ -139,11 +139,11 @@ class networks(object):
         # The labels should be 1 where sgm is False and 0 otherwise.
         new_gamma[i] = np.int_(np.logical_not(sgm))
         # g.reset()
-        self.gamma = new_gamma
+        self.gamma = 0.5+ self.scale*(new_gamma-0.5)
 
     def update_u(self):
-        # new_u = self.u + F.softmax(self.uimage_output, dim=1)[:, 1, :, :].cpu().data.numpy() - self.gamma
-        new_u = self.u + (self.heatmap2segmentation(self.uimage_output).cpu().data.numpy() - self.gamma)
+        new_u = self.u + (F.softmax(self.uimage_output, dim=1)[:, 1, :, :].cpu().data.numpy() - self.gamma)
+        # new_u = self.u + (self.heatmap2segmentation(self.uimage_output).cpu().data.numpy() - self.gamma)
         print(np.array((self.heatmap2segmentation(self.uimage_output).cpu().data.numpy() - self.gamma).nonzero()).sum())
         assert new_u.shape == self.u.shape
 
@@ -193,9 +193,10 @@ class networks(object):
 
         ax2 = fig.add_subplot(222)
         # ax1.imshow(self.uimage[0].cpu().data.numpy().squeeze(),cmap='gray')
-        ax2.imshow(F.softmax(self.uimage_output, dim=1)[0][1].cpu().data.numpy(),cmap='gray')
+        ax2.imshow(F.softmax(self.uimage_output, dim=1)[0][1].cpu().data.numpy(),vmin=0, vmax=1,cmap='gray')
         # ax2.contour(F.softmax(self.uimage_output, dim=1)[0][1].cpu().data.numpy(),level=(0.5,0.5),colors="red",alpha=0.5)
         ax2.title.set_text('probability prediction')
+        # ax2.set_cl)
         ax2.set_axis_off()
 
         ax3 = fig.add_subplot(223)
@@ -211,7 +212,7 @@ class networks(object):
         ax4.clear()
         ax4.imshow(self.uimage[0].cpu().data.numpy().squeeze(), cmap='gray')
         # ax4.imshow(self.heatmap2segmentation(self.uimage_output).squeeze().cpu().data.numpy(),cmap='gray')
-        ax4.contour(self.heatmap2segmentation(self.uimage_output).squeeze().cpu().data.numpy(),level=[0],colors="red",alpha=1,linewidth=0.001)
+        ax4.contour(self.heatmap2segmentation(self.uimage_output).squeeze().cpu().data.numpy(),level=[0.5],colors="red",alpha=1,linewidth=0.001)
         # ax2.contour(F.softmax(self.uimage_output, dim=1)[0][1].cpu().data.numpy(),level=(0.5,0.5),colors="red",alpha=0.5)
         ax4.title.set_text('prediction mask')
         ax4.set_axis_off()
@@ -233,8 +234,8 @@ class networks(object):
         plt.contour(self.heatmap2segmentation(self.uimage_output).squeeze().cpu().data.numpy(),level=[0],colors="green",alpha=0.5,linewidth=0.001)
         plt.contour(self.gamma[0],level=[0],colors="red",alpha=0.3,linewidth=0.001)
         plt.title('Gamma')
-        figManager = plt.get_current_fig_manager()
-        figManager.window.showMaximized()
+        # figManager = plt.get_current_fig_manager()
+        # figManager.window.showMaximized()
         plt.show(block=False)
         plt.pause(0.01)
 
@@ -243,7 +244,7 @@ class networks(object):
         plt.clf()
         plt.title('Multipicator')
         plt.subplot(1, 1, 1)
-        plt.imshow(self.u.squeeze())
+        plt.imshow(np.abs(self.u.squeeze()))
         plt.colorbar()
         plt.show(block=False)
         plt.pause(0.01)
