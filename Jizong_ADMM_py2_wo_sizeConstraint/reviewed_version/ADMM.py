@@ -18,13 +18,13 @@ class networks(object):
         self.upbound = upperbound
         self.neural_net = neural_network
         self.reset()
-        self.optimiser = torch.optim.Adam(self.neural_net.parameters(), lr=0.0001)
+        self.optimiser = torch.optim.Adam(self.neural_net.parameters(), lr=0.001)
         self.CEloss_criterion = CrossEntropyLoss2d()
-        self.u_r = 1000
+        self.u_r = 1.0
         self.lamda = 0
         # self.set_bound=False
         self.sigma = 0.05
-        self.scale =0.5
+
 
     def limage_forward(self, limage, lmask):
         self.limage = limage
@@ -100,7 +100,7 @@ class networks(object):
         structure = np.zeros((3, 3))
         structure[2, 1] = 1
         g.add_grid_edges(nodeids, structure=structure, weights=weights, symmetric=True)
-        # self.set_bound=True
+
         return g
 
     def update_gamma(self):
@@ -108,7 +108,7 @@ class networks(object):
         unary_term_gamma_1 = np.multiply(
             (0.5 - (F.softmax(self.uimage_output, dim=1).cpu().data.numpy()[:, 1, :, :] + self.u)),
             1)
-        #
+
         # plt.figure(5,figsize=(4.5,4.5))
         # plt.clf()
         # plt.imshow(unary_term_gamma_1.squeeze())
@@ -139,7 +139,7 @@ class networks(object):
         # The labels should be 1 where sgm is False and 0 otherwise.
         new_gamma[i] = np.int_(np.logical_not(sgm))
         # g.reset()
-        self.gamma = 0.5+ self.scale*(new_gamma-0.5)
+        self.gamma = new_gamma
 
     def update_u(self):
         new_u = self.u + (F.softmax(self.uimage_output, dim=1)[:, 1, :, :].cpu().data.numpy() - self.gamma)

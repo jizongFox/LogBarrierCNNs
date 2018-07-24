@@ -19,7 +19,8 @@ board_loss = Dashboard(server='http://turing.livia.etsmtl.ca', env="ADMM_loss")
 
 use_gpu = True
 # device = "cuda" if torch.cuda.is_available() and use_gpu else "cpu"
-device =torch.device('cuda')
+# device =torch.device('cuda')
+device = 'cuda'
 
 batch_size = 1
 batch_size_val = 1
