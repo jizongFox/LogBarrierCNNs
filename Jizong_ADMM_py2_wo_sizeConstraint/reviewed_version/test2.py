@@ -2,9 +2,10 @@ import numpy as np,matplotlib.pyplot as plt
 import torch
 import torch.nn as nn,torch.nn.functional as F
 
-theta = torch.tensor([0.0],requires_grad=True)
+# theta = torch.randn((100,1),requires_grad=True)
+x = torch.randn((1,1),requires_grad=True)
 
-f = lambda x: F.sigmoid((x-5)*2)
+f = lambda x: F.sigmoid(x**2)
 
 def gamma (proba,u):
     if 0.5-(proba+u)>0:
@@ -16,20 +17,33 @@ learning_rate =0.1
 
 F_=[]
 G=[]
-T=[]
+U=[]
+total_iter=None
+initial_input = f(x)
 
-for i in xrange(30000):
-    print 'theta:%.2f, f(theta):%.2f, gamma:%.2f, u:%.2f'% (theta.item(),f(theta).item(),gamma(f(theta),u),u)
-    l = (f(theta)-gamma(f(theta),u))**2
+for i in range(10000):
+    # print (' f(x):%.2f, gamma:%.2f, u:%.2f'% (f(x).item(),gamma(f(x),u),u))
+    F_.append(f(x).item())
+    G.append(gamma(f(x),u))
+    U.append(u)
+
+    l = (f(x)-gamma(f(x),u))**2
     l.backward()
     with torch.no_grad():
-        theta-=theta.grad*learning_rate
+        x-=x.grad*learning_rate
         pass
-    u = u + (f(theta) - gamma(f(theta),u))
+    u = u + (f(x) - gamma(f(x),u))
+    if np.abs((f(x) - gamma(f(x),u)).detach())<1e-3:
+        total_iter=i+1
+        break
+print(initial_input.item(),total_iter)
+
     # print(theta.item(),f(theta).item(),gamma(f(theta),u),u.item())
 plt.figure()
-plt.plot(F_)
-plt.plot(G)
-plt.plot(T)
+
+plt.plot(G,label='gamma')
+plt.plot(U,label='error')
+plt.plot(F_,label='f')
+plt.legend()
 plt.show()
 
