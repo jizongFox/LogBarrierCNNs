@@ -39,22 +39,34 @@ def train_pretrain_network(input_image, target_image):
     return net
 
 class ADMM(object):
+    '''
+
+
+
+    '''
     def __init__(self,neural_network, input_image, lower_band,upper_band) -> None:
         super().__init__()
         self.neural_net = neural_network,
         self.lowerband= lower_band
         self.upperband = upper_band
         self.learning_rate = 1e-3
-        self.opitimiser = torch.optim.Adam(self.neural_net.parameters(),lr = self.learning_rate)
+        self.opitimiser = torch.optim.SGD(self.neural_net.parameters(),lr = self.learning_rate,nesterov=True)
         self.input_image = input_image
+        self.reset()
+        self.forward_image(self.input_image)
+    def reset(self):
+        pass
+
+
     def forward_image(self):
         self.output_image = self.neural_net(self.input_image)
-
+        self.p = 1
     def heatmap2segmentation(self, heatmap):
         return heatmap.max(1)[1]
 
     def update_theta(self):
-        pass
+        loss = self.update_gamma()
+
 
     def update_gamma(self):
         pass
@@ -82,5 +94,11 @@ if __name__ =="__main__":
     output_image = imread("PyMaxFlow_Examples/a2.png")/255.0
     input_image =  np.random.randn(*output_image.shape)
     net = train_pretrain_network(input_image,output_image)
-    plt.imshow(net(torch.tensor(input_image).float().unsqueeze(0)).data.numpy().squeeze())
+    plt.imshow(net(torch.tensor(input_image).float().unsqueeze(0)).data.numpy().squeeze(),cmap = 'gray')
+    plt.colorbar()
     plt.show()
+
+    '''
+    
+    
+    '''
