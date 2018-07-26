@@ -33,7 +33,7 @@ for i in range(10000):
         x-=x.grad*learning_rate
         pass
     u = u + (f(x) - gamma(f(x),u))
-    if np.abs((f(x) - gamma(f(x),u)).detach())<1e-3:
+    if np.abs((f(x) - gamma(f(x),u)).detach())<1e-8:
         total_iter=i+1
         break
 print(initial_input.item(),total_iter)
