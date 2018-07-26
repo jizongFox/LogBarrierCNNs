@@ -94,8 +94,7 @@ def main():
         f_theta_unlabeled = net(unlabeled_img)  # b,c,w,h
         gamma = pred2segmentation(f_theta_unlabeled).detach()  # b, w, h
         s = gamma  # b w h
-        u = np.zeros(list(gamma.shape))  # b w h
-        v = np.zeros(u.shape)  # b w h
+        u = np.zeros(list(gamma.shape))  # b w h v = np.zeros(u.shape)  # b w h
         global u_r, u_s
         u_r = 1
         u_s = 1
