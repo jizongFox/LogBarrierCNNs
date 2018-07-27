@@ -106,7 +106,7 @@ class networks(object):
     def update_gamma(self):
 
         unary_term_gamma_1 = np.multiply(
-            (0.5 - (F.softmax(self.uimage_output, dim=1).cpu().data.numpy()[:, 1, :, :] + self.u)),
+            (0.5 - (F.softmax   (self.uimage_output, dim=1).cpu().data.numpy()[:, 1, :, :] + self.u)),
             1)
 
         # plt.figure(5,figsize=(4.5,4.5))
