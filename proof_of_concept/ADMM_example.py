@@ -31,7 +31,7 @@ def train_pretrain_network(input_image, target_image):
     output_image = torch.tensor(target_image).float().unsqueeze(0)
     criterion = nn.MSELoss()
     optimiser = torch.optim.Adam(params=net.parameters(),lr=1e-3)
-    for i in range(50):
+    for i in range(100):
         optimiser.zero_grad()
         output = net(input_image)
         loss = criterion(output, output_image)
@@ -75,23 +75,23 @@ class ADMM(object):
         self.lowerband= lower_band
         self.upperband = upper_band
         self.learning_rate = 1e-4
-        self.opitimiser = torch.optim.SGD(self.neural_net.parameters(),lr = self.learning_rate,momentum=0.9,nesterov=True)
+        self.opitimiser = torch.optim.Adam(self.neural_net.parameters(),lr = self.learning_rate)
         self.input_image = input_image
         self.forward_image()
         self.p = 1
-        self.neighor=0.05
+        self.neighor=0.1
 
     def reset(self):
         self.input_image=None
         self.proba=None
-        self.gamma = None
         self.p =1
+        self.gamma = np.zeros((64,64))
+        self.u = np.zeros((1,64,64))
 
 
     def forward_image(self):
         self.proba = self.neural_net(torch.tensor(self.input_image).float().unsqueeze(0))
-        self.gamma = np.zeros((64,64))
-        self.u = np.zeros((64,64))
+
 
     def heatmap2segmentation(self, heatmap):
         return heatmap.max(1)[1]
@@ -101,6 +101,7 @@ class ADMM(object):
             self.opitimiser.zero_grad()
             loss =self.p*(torch.tensor(self.gamma +self.u).float() - self.proba).norm(2)**2
             loss.backward()
+            print(loss.item())
             self.opitimiser.step()
             self.forward_image()
 
@@ -130,12 +131,13 @@ class ADMM(object):
 
 
     def update_u(self):
-        self.u = self.u*0.9 + (self.gamma - (self.proba.data.numpy()>0.5)*1)*0.1
+        # self.u = self.u + (self.gamma - (self.proba.data.numpy()>0.5)*1)
+        self.u = self.u*0.9 + (self.gamma - self.proba.data.numpy())*0.1
     #
     def update(self):
 
-        self.update_theta()
         self.update_gamma()
+        self.update_theta()
         self.update_u()
 
     def show_proba(self):
@@ -157,6 +159,7 @@ class ADMM(object):
         plt.pause(0.001)
 
 if __name__ =="__main__":
+    np.random.seed(1)
     # image_input = np.random.randn(*(100,100))
     # image_output = np.random.randn(*image_input.shape)
     #
@@ -165,12 +168,15 @@ if __name__ =="__main__":
     # print()
     output_image = imread("PyMaxFlow_Examples/a2.png")/255.0
     input_image =  np.random.randn(*output_image.shape)
-    net = train_pretrain_network(input_image,output_image)
-
+    # net = train_pretrain_network(input_image,output_image)
+    # torch.save(net.state_dict(),'net.pth')
+    net = net = Net(input_image.size)
+    net.load_state_dict(torch.load('net.pth'))
     admm = ADMM(net,input_image,lower_band=5,upper_band=10)
     for i in range (100):
         admm.update()
         admm.show_proba()
         admm.show_gamma()
         admm.show_u()
+
         print()

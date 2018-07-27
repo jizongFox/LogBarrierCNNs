@@ -35,7 +35,7 @@ def method1():
     gamma_list = []
     u_list = []
 
-    for i in range(100):
+    for i in range(1000):
         ## update theta:
         l = p / 2 * (torch.tensor(gamma).float() - probability + torch.tensor(u).float()).norm(2) ** 2
         l.backward()
@@ -43,8 +43,8 @@ def method1():
             theta -= theta.grad * learning_rate
         probability = network(theta)
         gamma = get_gamma(probability.data.numpy(), u)
-        # u = u +(gamma - (probability.item()>0.5)*1.0)
-        u = u + (gamma - probability.item())
+        u = u +(gamma - (probability.item()>0.5)*1.0)
+        # u = u + (gamma - probability.item())
 
         print(probability.item(), gamma, u)
         p_list.append(probability.detach().item())
@@ -147,12 +147,6 @@ def inequality_method():
 
 
 
-
-
-
-
-
-
 if __name__ == '__main__':
-    method1()
-    # inequality_method()
+    # method1()
+    inequality_method()
