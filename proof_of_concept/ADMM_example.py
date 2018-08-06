@@ -79,7 +79,7 @@ class ADMM(object):
         self.input_image = input_image
         self.forward_image()
         self.p = 1
-        self.neighor=0.1
+        self.neighor=0.2
 
     def reset(self):
         self.input_image=None
@@ -97,7 +97,7 @@ class ADMM(object):
         return heatmap.max(1)[1]
 
     def update_theta(self):
-        for i in range(1):
+        for i in range(10):
             self.opitimiser.zero_grad()
             loss =self.p*(torch.tensor(self.gamma +self.u).float() - self.proba).norm(2)**2
             loss.backward()
@@ -132,12 +132,15 @@ class ADMM(object):
 
     def update_u(self):
         # self.u = self.u + (self.gamma - (self.proba.data.numpy()>0.5)*1)
-        self.u = self.u*0.9 + (self.gamma - self.proba.data.numpy())*0.1
+        # self.u = self.u*0.9 + (self.gamma - self.proba.data.numpy())*0.1
+        self.u = self.u - (self.gamma - self.proba.data.numpy())
+
     #
     def update(self):
 
         self.update_gamma()
         self.update_theta()
+
         self.update_u()
 
     def show_proba(self):
@@ -173,7 +176,7 @@ if __name__ =="__main__":
     net = net = Net(input_image.size)
     net.load_state_dict(torch.load('net.pth'))
     admm = ADMM(net,input_image,lower_band=5,upper_band=10)
-    for i in range (100):
+    for i in range (10000):
         admm.update()
         admm.show_proba()
         admm.show_gamma()

@@ -27,24 +27,30 @@ def method1():
     theta = torch.randn((1, 1), requires_grad=True)
     probability = network(theta * 0.01)
     u = 0
-    gamma = 0.5
+
     p = 1.0
-    learning_rate = 0.1
+    learning_rate = 0.01
 
     p_list = []
     gamma_list = []
     u_list = []
 
     for i in range(1000):
-        ## update theta:
-        l = p / 2 * (torch.tensor(gamma).float() - probability + torch.tensor(u).float()).norm(2) ** 2
-        l.backward()
-        with torch.no_grad():
-            theta -= theta.grad * learning_rate
-        probability = network(theta)
+        # nupdate gamma
         gamma = get_gamma(probability.data.numpy(), u)
-        u = u +(gamma - (probability.item()>0.5)*1.0)
-        # u = u + (gamma - probability.item())
+        ## update theta:
+        for i in range(5):
+            # l = p / 2 * (torch.tensor(gamma).float() - probability + torch.tensor(u).float()).norm(2) ** 2
+            l = u*(probability-torch.tensor(gamma).float()) + p/2* (probability-torch.tensor(gamma).float())**2
+            l.backward()
+            with torch.no_grad():
+                theta -= theta.grad * learning_rate
+                theta.grad.zero_()
+            probability = network(theta)
+
+        # u = u +(gamma - (probability.item()>0.5)*1.0)
+
+        u = u + (probability.item()-gamma )
 
         print(probability.item(), gamma, u)
         p_list.append(probability.detach().item())
@@ -54,6 +60,7 @@ def method1():
     plt.figure()
     plt.plot(p_list, label='probability')
     plt.plot(gamma_list, label='gamma')
+    plt.figure()
     plt.plot(u_list, label='u')
     plt.legend()
     plt.show()
@@ -122,6 +129,7 @@ def inequality_method():
         l_theta.backward()
         with torch.no_grad():
             theta-= theta.grad * learning_rate
+            theta.grad.zero_()
         prob = network(theta)
         P.append(prob.item())
 
@@ -148,5 +156,5 @@ def inequality_method():
 
 
 if __name__ == '__main__':
-    # method1()
-    inequality_method()
+    method1()
+    # inequality_method()
