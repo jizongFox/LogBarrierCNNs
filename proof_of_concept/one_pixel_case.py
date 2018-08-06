@@ -12,7 +12,8 @@ Two objectives here in this script.
 2. verify that for an image without interactions between pixels, meaning no boundary term.
 '''
 
-
+np.random.seed(1)
+# torch.random.manual_seed(2)
 # for one pixel case
 def get_gamma(proba, u):
     if abs(1 - proba + u) > abs(0 - proba + u):
@@ -28,29 +29,41 @@ def method1():
     probability = network(theta * 0.01)
     u = 0
 
-    p = 1.0
-    learning_rate = 0.01
+    p = 10
+    learning_rate = 0.1
 
     p_list = []
     gamma_list = []
     u_list = []
-
-    for i in range(1000):
+    lams=False
+    for i in range(100):
         # nupdate gamma
         gamma = get_gamma(probability.data.numpy(), u)
         ## update theta:
         for i in range(5):
-            # l = p / 2 * (torch.tensor(gamma).float() - probability + torch.tensor(u).float()).norm(2) ** 2
-            l = u*(probability-torch.tensor(gamma).float()) + p/2* (probability-torch.tensor(gamma).float())**2
+            # l = p / 2 * (probability- torch.tensor(gamma).float() + torch.tensor(u).float()).norm(2) ** 2
+            # l = p/2 * (torch.tensor(gamma).float()- probability + torch.tensor(u).float()).norm(2)**2
+
+            # l = u*(probability-torch.tensor(gamma).float()) + p/2* (probability-torch.tensor(gamma).float())**2
+            l = u*(torch.tensor(gamma).float()-probability) + p/2* (torch.tensor(gamma).float()-probability)**2
+
             l.backward()
             with torch.no_grad():
                 theta -= theta.grad * learning_rate
                 theta.grad.zero_()
             probability = network(theta)
 
-        # u = u +(gamma - (probability.item()>0.5)*1.0)
+        u = u +(gamma - (probability.item()>0.5)*1.0)
+        #
+        # u = u+ (gamma - probability.item())
+        # if ((probability.item()-gamma ) >0) !=lams:
+        #     u=0
 
-        u = u + (probability.item()-gamma )
+        # lams=((probability.item()-gamma ) >0)
+
+
+
+
 
         print(probability.item(), gamma, u)
         p_list.append(probability.detach().item())
@@ -60,6 +73,7 @@ def method1():
     plt.figure()
     plt.plot(p_list, label='probability')
     plt.plot(gamma_list, label='gamma')
+    plt.legend()
     plt.figure()
     plt.plot(u_list, label='u')
     plt.legend()

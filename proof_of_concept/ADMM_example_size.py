@@ -11,16 +11,16 @@ class Net(nn.Module):
         self.input_size = input_size
         self.linear1 = nn.Linear(in_features=input_size,out_features=1024)
         self.linear2 = nn.Linear(in_features=1024,out_features=2048)
-        self.linear3 = nn.Linear(in_features=2048,out_features=2048)
-        self.linear4 = nn.Linear(in_features=2048,out_features=input_size)
+        self.linear3 = nn.Linear(in_features=2048,out_features=4096)
+        self.linear4 = nn.Linear(in_features=4096,out_features=input_size)
 
     def forward(self, input):
         original_size = input.size()
         assert list(input.view(-1).size())[0] ==self.input_size,'size error'
         input = input.view(-1).unsqueeze(0)
-        output = F.leaky_relu(self.linear1(input))
-        output = F.leaky_relu(self.linear2(output))
-        output = F.leaky_relu(self.linear3(output))
+        output = F.relu(self.linear1(input))
+        output = F.relu(self.linear2(output))
+        output = F.relu(self.linear3(output))
         output = F.sigmoid(self.linear4(output))
 
         return output.reshape(original_size)
@@ -42,29 +42,22 @@ def train_pretrain_network(input_image, target_image):
 
 class ADMM(object):
     '''
-    min = R(gamma)  st: gamma = proba
+    to minimize the difference between the size control one and the output of the neural network.
 
-    augmented lagrange multiplier:
-    L = lambda R(gamma) + sum: u (gamma - proba) + p/2|gamma - proba|2^2
+    lagrangian L = v (f(x) - s) + p/2 * (f(x) - s )^2
 
-    in a scaled form:
+    su that  the sum of s should be constrained between the Smin and Smax.
 
-    L = lambda R(gamma) + ur |gamma - prob + u|2^2
+    the scaled form of the lagrangian L : p/2 * |f(x)-s + v|^2
 
-    to update theta:
+    to update f(x) one can use the conventional gradient descent.
 
-    argmin: l_theta = ur |gamma - prob +u|2^2
+    to update s, s+ = argmin p/2 * ( (f(x)+v)^2 + s - 2* (f(x)+v)*s )
+                    = argmin  s(1/2 - (f(x)+v))
+                    let  a = 1/2 - (f(x)+v)
+                s+ = argmin sum ai*si
+                st Smin <<sum si << Smax
 
-    to update gamma:
-
-    argmin: l_gamma = lambda R(gamma) _(unary term) + pixelwise sum of  (gamma + 2 gamma(u - prob) + (u - prob)^2)
-                    = lambda R(gamma) + pixelwised sum of 2 gamma(1/2 + u - prob)
-
-                    this can be extracted as an unary term of penalty (y==1)= 1/2 +u - prob and penalty(y==0) = 0
-                    and lambda can be viewed as the boundary term .
-
-    to update the multipiler
-    u = u + gamma - prob
 
 
     '''
@@ -86,7 +79,9 @@ class ADMM(object):
         self.proba=None
         self.p =1
         self.gamma = np.zeros((64,64))
+        self.s = np.zeros((64,64))
         self.u = np.zeros((1,64,64))
+        self.v = np.zeros((1,64,64))
 
 
     def forward_image(self):
@@ -97,9 +92,11 @@ class ADMM(object):
         return heatmap.max(1)[1]
 
     def update_theta(self):
-        for i in range(30):
+        for i in range(1):
             self.opitimiser.zero_grad()
-            loss =self.p*(torch.tensor(self.gamma +self.u).float() - self.proba).norm(2)**2
+            # loss =self.p*(torch.tensor(self.gamma +self.u).float() - self.proba).norm(2)**2
+            # above loss is for the gamma
+            loss =self.p/2* (self.proba - torch.tensor(self.s - self.v).float()).norm(2)**2
             loss.backward()
             print(loss.item())
             self.opitimiser.step()
@@ -128,23 +125,41 @@ class ADMM(object):
         self.gamma = new_gamma
 
 
-
-
     def update_u(self):
-        self.u = self.u + (self.gamma - (self.proba.data.numpy()>0.5)*1)
-        # self.u = self.u*0.1 + (self.gamma - self.proba.data.numpy())*0.01
-        # # self.u = self.u + (self.gamma - self.proba.data.numpy())
-        # print(self.u.max())
-        # self.neighor*=1.01
+        # self.u = self.u + (self.gamma - (self.proba.data.numpy()>0.5)*1)
+        self.u = self.u*0.1 + (self.gamma - self.proba.data.numpy())*0.000001
+        # self.u = self.u + (self.gamma - self.proba.data.numpy())
+        print(self.u.max())
+        self.neighor*=1.01
+
+
+
+    def update_s(self):
+        a = 0.5 - (self.proba.data.numpy().squeeze() + self.v[0])
+        original_shape = a.shape
+        a_ = np.sort(a.ravel())
+        useful_pixel_number = (a<0).sum()
+        if self.lowerband< useful_pixel_number and self.upperband > useful_pixel_number:
+            self.s = ((a<0)*1.0).reshape(original_shape)
+        if useful_pixel_number < self.lowerband:
+            self.s = ((a<=a_[self.lowerband])*1).reshape(original_shape)
+        if useful_pixel_number > self.upperband:
+            self.s = ((a<=a_[self.upperband])*1).reshape(original_shape)
+
+
+    def update_v(self):
+        # self.v = self.v + ((self.proba.data.numpy().squeeze()>0.5)*1.0-self.s.squeeze())
+        self.v = self.v*0.99 + (self.proba.data.numpy().squeeze()- self.s.squeeze())*0.1
         pass
 
     #
     def update(self):
 
-        self.update_gamma()
+        # self.update_gamma()
+        self.update_s()
         self.update_theta()
 
-        self.update_u()
+        self.update_v()
 
     def show_proba(self):
         proba= self.proba.data.numpy()[0]
@@ -162,6 +177,17 @@ class ADMM(object):
         plt.colorbar()
         plt.show(block=False)
         plt.pause(0.001)
+
+    def show_s(self):
+        plt.figure(2)
+        plt.clf()
+        plt.imshow(self.s,cmap='gray')
+        plt.colorbar()
+        plt.show(block=False)
+        plt.pause(0.001)
+
+
+
     def show_u(self):
         plt.figure(3)
         plt.clf()
@@ -170,18 +196,53 @@ class ADMM(object):
         plt.show(block=False)
         plt.pause(0.001)
 
+
+    def show_v(self):
+        plt.figure(3)
+        plt.clf()
+        plt.imshow(self.v[0],cmap='gray')
+        plt.colorbar()
+        plt.show(block=False)
+        plt.pause(0.001)
+
+
 if __name__ =="__main__":
     np.random.seed(1)
-
+    # image_input = np.random.randn(*(100,100))
+    # image_output = np.random.randn(*image_input.shape)
+    #
+    # net = Net(image_input.size)
+    # output_image = net(torch.tensor(image_input).float().unsqueeze(0))
+    # print()
     output_image = imread("PyMaxFlow_Examples/a2.png")/255.0
+    f = lambda x,y: -x**2 + -y**2
+    rng = 2
+    x_ = np.linspace(-rng, rng, 64)
+    y_ = np.linspace(-rng, rng, 64)
+    X_, Y_ = np.meshgrid(x_, y_)
+    Height = f(X_.reshape(-1), Y_.reshape(-1)).reshape(X_.shape)
+    Height = Height- Height.min()
+    Height = Height/Height.max()
+    # plt.imshow(Height,cmap='gray')
+    # plt.colorbar()
+    # plt.show()
+    # plt.contourf(X_, Y_, Height, 20, alpha=0.6, cmap=plt.cm.hot)
+    # # 绘制等高线
+    # C = plt.contour(X_, Y_, Height, 20, colors='black', linewidth=0.1)
+    # # 显示各等高线的数据标签
+    # plt.clabel(C, inline=True, fontsize=10)
+    # plt.show()
     input_image =  np.random.randn(*output_image.shape)
-    # net = train_pretrain_network(input_image,output_image)
-    # torch.save(net.state_dict(),'net.pth')
-    net  = Net(input_image.size)
-    net.load_state_dict(torch.load('net.pth'))
-    admm = ADMM(net,input_image,lower_band=5,upper_band=10)
+    # net = train_pretrain_network(input_image,Height)
+    # torch.save(net.state_dict(),'net_size.pth')
+    net = Net(input_image.size)
+    net.load_state_dict(torch.load('net_size.pth'))
+    admm = ADMM(net,input_image,lower_band=4000,upper_band=5000)
     for i in range (10000):
         admm.update()
         admm.show_proba()
-        admm.show_gamma()
-        admm.show_u()
+        # admm.show_gamma()
+        admm.show_s()
+        admm.show_v()
+
+        print()
