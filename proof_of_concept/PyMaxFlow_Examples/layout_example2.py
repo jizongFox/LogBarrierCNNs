@@ -12,34 +12,88 @@ from matplotlib import pyplot as plt
 from examples_utils import plot_graph_2d
 
 def create_graph():
+    np.random.seed(1)
+    img = np.random.randint(0,10,size=(5,5))
+    print(img)
+
     g = maxflow.Graph[float]()
     nodeids = g.add_grid_nodes((5,5))
+
+    structure = np.zeros((3,3))
+    structure [1,2] = 1
+    pad_im = np.pad(img, ((0, 0), (1, 1)), 'constant', constant_values=0)
+    weights = np.zeros((img.shape))
+    for i in range(img.shape[0]):
+        for j in range(img.shape[1]):
+            weights[i, j] = np.abs(pad_im[i, j+1] - pad_im[i, j + 2])
+    # print(weights)
+
+    g.add_grid_edges(nodeids, structure=structure, weights=weights, symmetric=True)
+
+    structure = np.zeros((3,3))
+    structure [2,1] = 1
+    pad_im = np.pad(img, ((1, 1), (0, 0)), 'constant', constant_values=0)
+    weights = np.zeros((img.shape))
+    for i in range(img.shape[0]):
+        for j in range(img.shape[1]):
+            weights[i, j] = np.abs(pad_im[i+1, j] - pad_im[i+2, j])
+    # print(weights)
+
+    g.add_grid_edges(nodeids, structure=structure, weights=weights, symmetric=True)
+
+    structure = np.zeros((3,3))
+    structure [0,2] = 1
+    pad_im = np.pad(img, ((1, 1), (1, 1)), 'constant', constant_values=0)
+    weights = np.zeros((img.shape))
+    for i in range(img.shape[0]):
+        for j in range(img.shape[1]):
+            weights[i, j] = np.abs(pad_im[i+1, j+1] - pad_im[i, j+2])
+    print(weights)
+
+    g.add_grid_edges(nodeids, structure=structure, weights=weights, symmetric=True)
+
+    structure = np.zeros((3,3))
+    structure [2,2] = 1
+    pad_im = np.pad(img, ((1, 1), (1, 1)), 'constant', constant_values=0)
+    weights = np.zeros((img.shape))
+    for i in range(img.shape[0]):
+        for j in range(img.shape[1]):
+            weights[i, j] = np.abs(pad_im[i+1, j+1] - pad_im[i+2, j+2])
+    print(weights)
+
+    g.add_grid_edges(nodeids, structure=structure, weights=weights, symmetric=True)
+
+
+
+
+
+    '''
     
     # Edges pointing backwards (left, left up and left down) with infinite
-    # capacity
-    structure = np.array([[np.inf, 0, 0],
-                          [np.inf, 0, 0],
-                          [np.inf, 0, 0]
-                         ])
-    g.add_grid_edges(nodeids, structure=structure, symmetric=False)
+    # # capacity
+    # structure = np.array([[np.inf, 0, 0],
+    #                       [np.inf, 0, 0],
+    #                       [np.inf, 0, 0]
+    #                      ])
+    # g.add_grid_edges(nodeids, structure=structure, symmetric=False)
     
     # Set a few arbitrary weights
-    weights = np.array([[100, 110, 120, 130, 140]]).T + np.array([0, 2, 4, 6, 8])
-    
+    # weights = np.array([[100, 110, 120, 130, 140]]).T + np.array([0, 2, 4, 6, 8])
+
     # Edges pointing right
     structure = np.zeros((3,3))
     structure[1,2] = 1
-    g.add_grid_edges(nodeids, structure=structure, weights=weights, symmetric=False)
-    
+    g.add_grid_edges(nodeids, structure=structure, weights=weights, symmetric=True)
+
     # Edges pointing up
     structure = np.zeros((3,3))
     structure[0,1] = 1
-    g.add_grid_edges(nodeids, structure=structure, weights=weights+100, symmetric=False)
-    
-    # Edges pointing down
-    structure = np.zeros((3,3))
-    structure[2,1] = 1
-    g.add_grid_edges(nodeids, structure=structure, weights=weights+200, symmetric=False)
+    g.add_grid_edges(nodeids, structure=structure, weights=weights+100, symmetric=True)
+
+    # # Edges pointing down
+    # structure = np.zeros((3,3))
+    # structure[2,1] = 1
+    # g.add_grid_edges(nodeids, structure=structure, weights=weights+200, symmetric=False)
     
     # Source node connected to leftmost non-terminal nodes.
     left = nodeids[:, 0]
@@ -47,7 +101,8 @@ def create_graph():
     # Sink node connected to rightmost non-terminal nodes.
     right = nodeids[:, -1]
     g.add_grid_tedges(right, 0, np.inf)
-    
+
+    '''
     return nodeids, g
 
 if __name__ == '__main__':
