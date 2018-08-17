@@ -5,7 +5,7 @@ from torch import nn
 from torch.autograd import Variable
 
 from layers import upSampleConv, conv_block_1, conv_block_3_3, conv_block_Asym
-
+device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
 class BottleNeckDownSampling(nn.Module):
     def __init__(self, in_dim, projectionFactor, out_dim):
@@ -40,13 +40,12 @@ class BottleNeckDownSampling(nn.Module):
         p1 = self.PReLU1(b1)
 
         p2 = self.block2(p1)
-
         do = self.do(p2)
 
         # Zero padding the feature maps from the main branch
         depth_to_pad = abs(maxpool_output.shape[1] - do.shape[1])
         padding = Variable(torch.zeros(maxpool_output.shape[0], depth_to_pad, maxpool_output.shape[2],
-                           maxpool_output.shape[3]).cuda())
+                           maxpool_output.shape[3]).to(device))
         maxpool_output_pad = torch.cat((maxpool_output, padding), 1)
         output = maxpool_output_pad + do
         output = self.PReLU3(output)

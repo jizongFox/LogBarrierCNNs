@@ -4,9 +4,13 @@ import pdb
 
 import torch
 import numpy as np
+import warnings
+warnings.filterwarnings('ignore')
 
+device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
 class Partial_CE(torch.autograd.Function):
+
     def forward(self, input, target, weakLabels):
         self.save_for_backward(input, target, weakLabels)
         # b, c, w, h = input.shape
@@ -17,7 +21,7 @@ class Partial_CE(torch.autograd.Function):
 
         eps = 1e-20
 
-        softmax_y = input.cpu().numpy()
+        softmax_y = input.cpu().data.numpy()
         numPixelsNonMasked = weakLabels.sum()
 
         # Mask the non-annotated pixels
@@ -30,7 +34,7 @@ class Partial_CE(torch.autograd.Function):
         lossT = torch.FloatTensor(1)
         lossT.fill_(np.float32(loss).item())
 
-        return lossT.cuda()   # a single number (averaged loss over batch samples)
+        return lossT.to(device)  # a single number (averaged loss over batch samples)
 
     def backward(self, grad_output):
         input, target, weakLabels = self.saved_variables
@@ -50,14 +54,15 @@ class Partial_CE(torch.autograd.Function):
             grad_input = -oneHotLabels/(softmax_y+eps)
             grad_input *= mask
             grad_input /= numPixelsNonMasked
-        else:
+        else: # there is no gradient to be generated
             grad_input = torch.FloatTensor(1)
             grad_input.fill_(0.0)
 
-        return grad_input.cuda(), None, None
+        return grad_input.to(device), None, None
 
 
 class MIL_Loss(torch.autograd.Function):
+
     def forward(self, input, target):
         self.save_for_backward(input, target)
 
@@ -79,7 +84,7 @@ class MIL_Loss(torch.autograd.Function):
         if np.isnan(loss.numpy()[0]):
             pdb.set_trace()
 
-        return lossT.cuda()   # a single number (averaged loss over batch samples)
+        return lossT.to(device)   # a single number (averaged loss over batch samples)
 
     def backward(self, grad_output):
         input, target = self.saved_variables
@@ -109,15 +114,16 @@ class MIL_Loss(torch.autograd.Function):
 
         grad_input = np.concatenate((grad_inputA, grad_inputB), 1)
 
-        return torch.Tensor(grad_input).cuda(), None
+        return torch.Tensor(grad_input).to(device), None
 
 
 class Size_Loss(torch.autograd.Function):
+
     def forward(self, input, target, lower_B, upper_B):
         self.save_for_backward(input, target, lower_B, upper_B)
 
         # Compute the hard size of the prediction
-        softmax_y = input.cpu().numpy()
+        softmax_y = input.cpu().data.numpy()
         softB = softmax_y[:, 1, :, :]
 
         # Soft Dice
@@ -141,7 +147,7 @@ class Size_Loss(torch.autograd.Function):
         if (np.isnan(loss.numpy()[0])):
             pdb.set_trace()
 
-        return lossT.cuda()
+        return lossT.to(device)
 
     def backward(self, grad_output):
         input, target, lower_B, upper_B = self.saved_variables
@@ -177,4 +183,4 @@ class Size_Loss(torch.autograd.Function):
 
         grad_input = np.concatenate((grad_inputA, grad_inputB), 1)
 
-        return torch.Tensor(grad_input).cuda(), None, None, None
+        return torch.Tensor(grad_input).to(device), None, None, None

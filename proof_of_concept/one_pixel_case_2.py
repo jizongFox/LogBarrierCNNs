@@ -12,42 +12,47 @@ Two objectives here in this script.
 2. verify that for an image without interactions between pixels, meaning no boundary term.
 '''
 
-# np.random.seed(1)
+np.random.seed(1)
 # torch.random.manual_seed(2)
 # for one pixel case
-def get_gamma(proba, u):
-    if abs(1 - proba+ u ) > abs(0 - proba + u):
-        return 0
-    else:
-        return 1
+# def get_gamma(proba, u):
+#     if abs(1 - proba+ u ) > abs(0 - proba + u):
+#         return 0
+#     else:
+#         return 1
+
+def get_gamma(theta_):
+    return F.sigmoid(theta_*100)-0.25
 
 
 def method1():
     network = lambda theta: F.sigmoid(theta)
 
     theta = torch.randn((1, 1), requires_grad=True)
+    theta_ = torch.randn((1, 1), requires_grad=True)
+
     probability = network(theta * 0.01)
+    gamma = get_gamma(theta_)
     u = 0
 
-
-    p = 0.01
+    p = 1
     learning_rate = 0.1
 
     p_list = []
     gamma_list = []
     u_list = []
     lams = False
-    for i in range(10000):
+    for i in range(1000):
         # nupdate gamma
-        gamma = get_gamma(probability.data.numpy(), u)
+        gamma = get_gamma(theta_)
         ## update theta:
         for i in range(1):
             # l = p / 2 * (probability- torch.tensor(gamma).float() + torch.tensor(u).float()).norm(2) ** 2
             # l = p/2 * (torch.tensor(gamma).float()- probability + torch.tensor(u).float()).norm(2)**2
 
             # l = u*(probability-torch.tensor(gamma).float()) + p/2* (probability-torch.tensor(gamma).float())**2
-            l = u * (torch.tensor(gamma).float() - probability) + p / 2 * (
-                        torch.tensor(gamma).float() - probability) ** 2
+            l = u * (gamma.detach()- probability) + p / 2 * (
+                        gamma.detach() - probability) ** 2
 
             l.backward()
             with torch.no_grad():
@@ -55,9 +60,23 @@ def method1():
                 theta.grad.zero_()
             probability = network(theta)
 
-        u = u + (gamma - (probability.item()))*0.001
-        # TODO01
+        for i in range(1):
+            # l = p / 2 * (probability- torch.tensor(gamma).float() + torch.tensor(u).float()).norm(2) ** 2
+            # l = p/2 * (torch.tensor(gamma).float()- probability + torch.tensor(u).float()).norm(2)**2
 
+            # l = u*(probability-torch.tensor(gamma).float()) + p/2* (probability-torch.tensor(gamma).float())**2
+            l = u * (gamma- probability.detach()) + p / 2 * ( gamma - probability.detach()) ** 2
+
+            l.backward()
+            with torch.no_grad():
+                theta_ -= theta_.grad * learning_rate
+                theta_.grad.zero_()
+            gamma = get_gamma(theta_)
+
+
+        u = u +p*(gamma.item() - (probability.item())*1.0)
+        #
+        # u = u * 0.9+ (gamma - probability.item()) * 0.1
         # if ((probability.item()-gamma ) >0) !=lams:
         #     u=0
 

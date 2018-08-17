@@ -1,8 +1,9 @@
 #!/usr/bin/env python3.6
 
 import os
+import pandas as pd
 
-os.environ['CUDA_VISIBLE_DEVICES'] = "3"
+os.environ['CUDA_VISIBLE_DEVICES'] = "0"
 import torch
 import numpy as np
 from torch import nn
@@ -44,7 +45,7 @@ def runTraining():
     lr = 0.0005
     epoch = 1000
 
-    root_dir = '/home/AN96120/python_project/LogBarrierCNNs/ACDC-2D-All'
+    root_dir = '/Users/jizong/workspace/LogBarrierCNNs/ACDC-2D-All'
     model_dir = 'model'
 
     transform = transforms.Compose([
@@ -54,7 +55,6 @@ def runTraining():
     mask_transform = transforms.Compose([
         transforms.ToTensor()
     ])
-
     train_set = medicalDataLoader.MedicalImageDataset('train',
                                                       root_dir,
                                                       transform=transform,
@@ -65,7 +65,8 @@ def runTraining():
     train_loader = DataLoader(train_set,
                               batch_size=batch_size,
                               num_workers=2,
-                              shuffle=False)
+                              shuffle=False,
+                              drop_last=True)
 
     val_set = medicalDataLoader.MedicalImageDataset('val',
                                                     root_dir,
@@ -132,6 +133,8 @@ def runTraining():
             # prevent batchnorm error for batch of size 1
             if image.size(0) != batch_size:
                 continue
+            if weak_labels.sum()<=0:
+                continue
 
             optimizerG.zero_grad()
             netG.zero_grad()
@@ -197,7 +200,9 @@ def runTraining():
         if not os.path.exists(directory):
             os.makedirs(directory)
 
-        np.save(os.path.join(directory, modelName + '_Losses.npy'), Losses)
+        pd.Series(Losses).to_csv(os.path.join(directory, modelName + 'train_Losses.csv'))
+        pd.Series(dBAll).to_csv(os.path.join(directory, modelName + 'val_dBAll_fiou.csv'))
+        # np.save(os.path.join(directory, modelName + '_Losses.npy'), Losses)
         np.save(os.path.join(directory, modelName + '_dBAll.npy'), dBAll)
 
         currentDice = d1

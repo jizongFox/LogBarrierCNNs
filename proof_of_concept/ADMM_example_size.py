@@ -149,7 +149,8 @@ class ADMM(object):
 
     def update_v(self):
         # self.v = self.v + ((self.proba.data.numpy().squeeze()>0.5)*1.0-self.s.squeeze())
-        self.v = self.v*0.99 + (self.proba.data.numpy().squeeze()- self.s.squeeze())*0.1
+        self.v = self.v + (self.proba.data.numpy().squeeze()- self.s.squeeze())*0.001
+        print(self.v.mean())
         pass
 
     #
@@ -237,7 +238,7 @@ if __name__ =="__main__":
     # torch.save(net.state_dict(),'net_size.pth')
     net = Net(input_image.size)
     net.load_state_dict(torch.load('net_size.pth'))
-    admm = ADMM(net,input_image,lower_band=4000,upper_band=5000)
+    admm = ADMM(net,input_image,lower_band=200,upper_band=250)
     for i in range (10000):
         admm.update()
         admm.show_proba()
