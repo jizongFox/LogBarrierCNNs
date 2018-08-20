@@ -158,7 +158,7 @@ def runTraining():
             # sizeLoss_val = size_loss(segmentation_prediction, Segmentation_planes, Variable(minSize), Variable(maxSize))
             sizeLoss_val = size_loss(predClass_y, Segmentation_planes, Variable(minSize), Variable(maxSize))
 
-            # MIL_Loss_val = mil_loss(predClass_y, Segmentation_planes)
+            MIL_Loss_val = mil_loss(predClass_y, Segmentation_planes)
 
             # Dice loss (ONLY USED TO COMPUTE THE DICE. This DICE loss version does not work)
             DicesN, DicesB = Dice_loss(segmentation_prediction_ones, Segmentation_planes)
@@ -191,17 +191,17 @@ def runTraining():
                          done=f"[Training] Epoch: {i}, LossG: {np.mean(lossVal):.4f}, lossMSE: {np.mean(lossVal1):.4f}")
 
         Losses.append(np.mean(lossVal))
-        d1, sizeGT, sizePred = inference(netG, temperature, val_loader, batch_size, i, deepSupervision, modelName,
+        (d0,d1), sizeGT, sizePred = inference(netG, temperature, val_loader, batch_size, i, deepSupervision, modelName,
                                          minVal, maxVal)
 
-        dBAll.append(d1)
+        dBAll.append((d0,d1))
 
         directory = 'Results/Statistics/MIDL/' + modelName
         if not os.path.exists(directory):
             os.makedirs(directory)
 
         pd.Series(Losses).to_csv(os.path.join(directory, modelName + 'train_Losses.csv'))
-        pd.Series(dBAll).to_csv(os.path.join(directory, modelName + 'val_dBAll_fiou.csv'))
+        pd.DataFrame(dBAll,columns=['background','foreground']).to_csv(os.path.join(directory, modelName + 'val_dBAll_fiou.csv'))
         # np.save(os.path.join(directory, modelName + '_Losses.npy'), Losses)
         np.save(os.path.join(directory, modelName + '_dBAll.npy'), dBAll)
 

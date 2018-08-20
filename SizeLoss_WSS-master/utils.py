@@ -135,7 +135,7 @@ def inference(net, temperature, img_batch, batch_size, epoch, deepSupervision, m
     total = len(img_batch)
 
     Dice1 = torch.zeros(total, 2)
-
+    Dice0 = torch.zeros(total, 2)
     net.eval()
 
     img_names_ALL = []
@@ -183,7 +183,7 @@ def inference(net, temperature, img_batch, batch_size, epoch, deepSupervision, m
         sizeLV_GT = len(idx[0])
         sizesGT.append(sizeLV_GT)
         sizesPred.append(sizePredNumpy)
-
+        '''
         if sizeLV_GT > 0:
             if sizePredNumpy < minSize:
                 out = torch.cat((MRI, pred_y[:, 1, :, :].view(1, 1, 256, 256), Segmentation))
@@ -225,11 +225,13 @@ def inference(net, temperature, img_batch, batch_size, epoch, deepSupervision, m
                                              range=None,
                                              scale_each=False,
                                              pad_value=0)
+        '''
 
         DicesN, Dices1 = dice(pred_y, Segmentation_planes)
+        Dice0[i]=DicesN.data
         Dice1[i] = Dices1.data
     printProgressBar(total, total, done="[Inference] Segmentation Done !")
+    ValDice0 = float(DicesToDice(Dice0))
+    ValDice1 = float(DicesToDice(Dice1))
 
-    ValDice1 = DicesToDice(Dice1)
-
-    return [ValDice1, sizesGT, sizesPred]
+    return [(ValDice0,ValDice1), sizesGT, sizesPred]

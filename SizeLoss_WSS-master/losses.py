@@ -66,7 +66,7 @@ class MIL_Loss(torch.autograd.Function):
     def forward(self, input, target):
         self.save_for_backward(input, target)
 
-        softmax_y = input.cpu().numpy()
+        softmax_y = input.cpu().data.numpy()
         softB = softmax_y[:, 1, :, :]
 
         sizePredNumpy = softB.sum()

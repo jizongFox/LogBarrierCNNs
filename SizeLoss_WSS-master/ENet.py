@@ -360,3 +360,6 @@ class ENet(nn.Module):
         unpool_12 = self.deconv3(up_block_1)
 
         return self.final(unpool_12)
+
+
+
