@@ -2,6 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+use_gpu = True
+device = torch.device('cuda') if torch.cuda.is_available() and use_gpu else torch.device('cpu')
+
 class CrossEntropyLoss2d(nn.Module):
 
     def __init__(self, weight=None,reduce=True,size_average=True):
@@ -28,30 +31,31 @@ class partialCrossEntropyLoss2d(nn.Module):
 
 class logBarrierLoss(nn.Module):
 
-    def __init__(self,low_band,high_band,):
+    def __init__(self,low_band,high_band,temporature=0.1):
         super().__init__()
         self.low_band = low_band
         self.high_band = high_band
+        self.temperature = float(temporature)
 
 
     def forward(self, probability):
         total_pixel_number = list(probability.view(-1).shape)[0]
         if probability.sum(1).mean()!=1:
-            probability= F.softmax(probability,dim=1)
+            probability= F.softmax(probability/self.temperature,dim=1)
         sum_pixels= probability[:,1,:,:].sum(-1).sum(-1)
-        loss_t = torch.Tensor([0]).cuda()
+        loss_table = []
         for image in sum_pixels:
             if image>= self.high_band:
                 loss = (image-self.high_band)**2/total_pixel_number
-            if image <= self.low_band:
+            elif image <= self.low_band:
                 loss = (sum_pixels - self.low_band) ** 2/total_pixel_number
-            if (image>self.low_band) and (image<self.high_band):
-                loss = torch.Tensor([0]).cuda()
-            try:
-                loss_t=torch.cat((loss_t,loss.unsqueeze(0)),0)
-            except:
-                loss_t = torch.cat((loss_t, loss), 0)
-        return loss_t.sum()/(loss_t.shape[0]-1)
+            elif (image>self.low_band) and (image<self.high_band):
+                loss = torch.tensor(0.0).float().to(device)
+            else:
+                raise ValueError
+            loss_table.append(loss)
+        loss_t = torch.stack(loss_table)
+        return loss_t.mean()
 
 
 def dice_loss(input, target):
@@ -63,8 +67,17 @@ def dice_loss(input, target):
     intersection = (iflat * tflat).sum(1)
     # intersection = (iflat == tflat).sum(1)
 
-    return ((2. * intersection + smooth).float() /  (iflat.sum(1) + tflat.sum(1) + smooth).float()).mean()
+    foreground_iou = float( ((2. * intersection + smooth).float() /  (iflat.sum(1) + tflat.sum(1) + smooth).float()).mean())
     # return ((2. * intersection + smooth).float() / (iflat.size(1)+ tflat.size(1) + smooth)).mean()
+
+
+    iflat = 1- input.view(input.size(0),-1)
+    tflat = 1- target.view(input.size(0),-1)
+    intersection = (iflat * tflat).sum(1)
+    # intersection = (iflat == tflat).sum(1)
+
+    backgroud_iou = float( ((2. * intersection + smooth).float() /  (iflat.sum(1) + tflat.sum(1) + smooth).float()).mean())
+    return [backgroud_iou, foreground_iou]
 
 if __name__=="__main__":
     output_of_the_net = torch.rand(16, 2, 256,256)

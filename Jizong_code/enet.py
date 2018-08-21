@@ -4,7 +4,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
-
+use_gpu = True
+device = torch.device('cuda') if torch.cuda.is_available() and use_gpu else torch.device('cpu')
 class InitialBlock(nn.Module):
     '''
     The initial block for Enet has 2 branches: The convolution branch and
@@ -134,8 +135,8 @@ class BottleNeck(nn.Module):
                                             self.output_channels - self.input_channels,
                                             input_shape[2] // 2,
                                             input_shape[3] // 2).zero_(), requires_grad=False)
-                if (torch.cuda.is_available):
-                    pad = pad.cuda(0)
+
+                pad = pad.to(device)
                 main = torch.cat((main, pad), 1)
         elif self.upsampling:
             main = self.unpool(self.conv_before_unpool(input), pooling_indices)

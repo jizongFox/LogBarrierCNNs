@@ -6,8 +6,8 @@ from visdom import Visdom
 
 class Dashboard:
 
-    def __init__(self, server='http://turing.livia.etsmtl.ca',port=8097,env='default'):
-        self.vis = Visdom(port=port,server=server,env=env)
+    def __init__(self, server='http://localhost',port=8097,env='default'):
+        self.vis = Visdom(port=port,server=server,env=env,use_incoming_socket=True)
         self.index = {}
         self.log_text = ''
 
