@@ -100,6 +100,7 @@ def runTraining():
     print(' Model name: {}'.format(modelName))
     partial_ce = Partial_CE()
     mil_loss = MIL_Loss()
+
     size_loss = Size_Loss()
 
     if torch.cuda.is_available():
